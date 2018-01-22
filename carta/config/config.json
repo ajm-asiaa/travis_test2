@@ -1,0 +1,16 @@
+{
+    "_comment" : "List of plugin directories",
+    "pluginDirs": [
+        "$(APPDIR)/../plugins",
+        "$(APPDIR)/../../../../plugins"
+    ],
+    "disabledPlugins" : ["python273"],
+    "plugins": {
+        "PCacheSqlite3" : {
+            "dbPath": "$(HOME)/CARTA/cache/pcache.sqlite"
+        }
+    },
+    "percentileApproximation" : "true",
+    "percentApproxDividedNum" : 1000000
+}
+
