@@ -1,0 +1,37 @@
+sudo: required
+
+language: ruby
+
+services:
+  - docker
+
+branches:
+  only:
+    - develop 
+
+before_install:
+  - pwd
+  - ls -sort
+  - cd ..
+  - mv travis_test CARTAvis
+  - cd CARTAvis
+  - ls -sort
+  - pwd
+  - echo $PWD
+  - docker pull ajmasiaa/centos7-carta-server-18-10-2017
+  - docker ps -a
+  - docker run -ti -v $PWD:/cartabuild/CARTAvis ajmasiaa/centos7-carta-server-18-10-2017 /bin/sh -c "chmod 755 /cartabuild/CARTAvis/run.sh && /cartabuild/CARTAvis/run.sh"
+
+script:
+  - cd $HOME/build/ajm-asiaa/CARTAvis/build
+  - ls -sort
+  - sudo git clone https://github.com/ajm-asiaa/gdrive_uploader_linux.git
+  - ls -sort
+  - sudo chmod -R 777 gdrive_uploader_linux
+  - cd gdrive_uploader_linux
+  - ls -sort
+  - sudo mv ../carta-centos7-test.tar.gz .
+  - ls -sort
+  - node --version
+  - npm install
+  - npm start
