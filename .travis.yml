@@ -1,7 +1,5 @@
 sudo: required
 
-dist: trusty
-
 language: ruby
 
 services:
@@ -34,7 +32,7 @@ script:
   - ls -sort
   - sudo mv ../carta-centos7-test.tar.gz .
   - ls -sort
-  - ls -sort
-  - node --version
-  - npm install
-  - npm start
+#  - ls -sort
+#  - node --version
+#  - npm install
+#  - npm start
