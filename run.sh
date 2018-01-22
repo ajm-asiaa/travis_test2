@@ -99,5 +99,5 @@ mv carta-centos7-test.tar.gz /cartabuild/CARTAvis/build
 
 cd /cartabuild/CARTAvis/build
 
-ls
+ls -sort
 
