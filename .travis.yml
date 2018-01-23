@@ -20,7 +20,7 @@ before_install:
   - echo $PWD
   - docker pull ajmasiaa/centos7-carta-server-18-10-2017
   - docker ps -a
-  - docker run -ti -v $PWD:/cartabuild/CARTAvis ajmasiaa/centos7-carta-server-18-10-2017 /bin/sh -c "chmod 755 /cartabuild/CARTAvis/run.sh && /cartabuild/CARTAvis/run.sh"
+  - docker run -ti -v $PWD:/cartabuild/CARTAvis ajmasiaa/centos7-carta-server-18-10-2017 /bin/bash -c "chmod 755 /cartabuild/CARTAvis/run.sh && /cartabuild/CARTAvis/run.sh"
 
 script:
   - cd $HOME/build/ajm-asiaa/CARTAvis/build
