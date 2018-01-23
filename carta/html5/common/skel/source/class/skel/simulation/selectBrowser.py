@@ -11,11 +11,11 @@ print("Timeouts? 1. Yes  2. No")
 sleep = int(input("Timeouts: "))
 
 def _getBrowser():
-	return 2
+	return browser
 
 def _getSleep():
-	# if sleep == 1:
-	# 	timeout = 4
-	# else:
-	# 	timeout = 0
-	return 0
+	if sleep == 1:
+		timeout = 4
+	else:
+		timeout = 0
+	return timeout

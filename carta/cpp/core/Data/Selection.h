@@ -44,7 +44,7 @@ public:
      * Returns a json string representing the state of this selection.
      * @return a string representing the state of this selection.
      */
-    QString getStateString( const QString& sessionId = "", SnapshotType type = SNAPSHOT_INFO ) const override;
+    QString getStateString() const;
 
     /**
      * Returns the upper bound for the selection.
@@ -64,10 +64,6 @@ public:
      * @return an error message if the index was not set; otherwise and empty string.
      */
     QString setIndex( int val);
-
-    QString setIndex( int val, QStringList fileList );
-
-    void setFileList(QStringList fileList);
 
     /**
      * Sets the lower bound of the selection.
@@ -111,10 +107,8 @@ public:
     static const QString SELECTIONS;
     //Identifier for an image.
     const static QString IMAGE;
-    const static QString REGION;
     //Identifier for a channel.
     static const QString CHANNEL;
-    static const QString FILELIST;
 
     static bool m_registered;
 

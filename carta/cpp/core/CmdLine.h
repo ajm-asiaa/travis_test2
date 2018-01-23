@@ -17,7 +17,7 @@ public:
     /// returns the path to the configuaration file
     /// set either through '--cfg file' option or $CARTAVIS_CONFIG environment
     /// if config file was not provided, the default is used, which is:
-    /// $HOME/.cartavis/config.json (1st option) or $(carta build)/config/config.json (2nd option)
+    /// $HOME/.cartavis/config.json
     QString configFilePath() const;
 
     /// returns the path to the html file, only used by the desktop version

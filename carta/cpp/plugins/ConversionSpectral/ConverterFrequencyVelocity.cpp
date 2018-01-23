@@ -8,16 +8,16 @@ ConverterFrequencyVelocity::ConverterFrequencyVelocity(const QString& oldUnits,
 }
 
 
-casacore::Vector<double> ConverterFrequencyVelocity::convert( const casacore::Vector<double>& oldValues,
-        casacore::SpectralCoordinate spectralCoordinate ) {
-    casacore::Vector<double> frequencyValues(oldValues.size());
+casa::Vector<double> ConverterFrequencyVelocity::convert( const casa::Vector<double>& oldValues,
+        casa::SpectralCoordinate spectralCoordinate ) {
+    casa::Vector<double> frequencyValues(oldValues.size());
     frequencyValues = oldValues;
 
     //Find out the frequency units the spectral coordinate is using and
     //compare them to the frequency units we are using.  Transform the
     //data if necessary to the units used by the spectral coordinate.
-    casacore::Vector<casacore::String> spectralUnits = spectralCoordinate.worldAxisUnits();
-    casacore::String spectralUnit = spectralUnits[0];
+    casa::Vector<casa::String> spectralUnits = spectralCoordinate.worldAxisUnits();
+    casa::String spectralUnit = spectralUnits[0];
     QString spectralUnitStr( spectralUnit.c_str() );
     if ( spectralUnitStr != oldUnits ) {
         ConverterFrequency::convertFrequency( frequencyValues, oldUnits, spectralUnitStr, spectralCoordinate );
@@ -25,7 +25,7 @@ casacore::Vector<double> ConverterFrequencyVelocity::convert( const casacore::Ve
     bool unitsUnderstood = spectralCoordinate.setVelocity( newUnits.toStdString() );
     bool successfulConversion = false;
     int dataCount = oldValues.size();
-    casacore::Vector<double> resultValues( dataCount );
+    casa::Vector<double> resultValues( dataCount );
     if ( unitsUnderstood ) {
         successfulConversion = spectralCoordinate.frequencyToVelocity( resultValues, frequencyValues );
     }

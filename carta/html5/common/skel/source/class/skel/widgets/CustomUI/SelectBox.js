@@ -8,7 +8,7 @@
  ******************************************************************************/
 
 qx.Class.define("skel.widgets.CustomUI.SelectBox", {
-    extend : qx.ui.form.SelectBox,
+    extend : qx.ui.form.SelectBox, 
 
     /**
      * Constructor.
@@ -19,18 +19,16 @@ qx.Class.define("skel.widgets.CustomUI.SelectBox", {
         this.base(arguments);
         this.m_cmd = cmd;
         this.m_paramId = paramId;
-        if ( typeof mImport !== "undefined"){
-            this.m_connector = mImport("connector");
-        }
+        this.m_connector = mImport("connector");
         this.m_selectListener = this.addListener( "changeSelection", this._sendCmd, this );
     },
-
+    
     events: {
         "selectChanged" : "qx.event.type.Data"
     },
 
     members : {
-
+        
         /**
          * Return the index of the first selected item.
          * @return {Number} - the index of the first selected item.
@@ -52,7 +50,7 @@ qx.Class.define("skel.widgets.CustomUI.SelectBox", {
             }
             return index;
         },
-
+        
         /**
          * Return the first value that the user selected.
          * @return {String} - the first user selected value or null if there
@@ -66,65 +64,27 @@ qx.Class.define("skel.widgets.CustomUI.SelectBox", {
             }
             return selection;
         },
-
+        
         /**
          * Sends a value change to the server.
          */
         _sendCmd : function(){
-        	if ( this.m_connector !== null ){
-        		var errorMan = skel.widgets.ErrorHandler.getInstance();
-        		errorMan.clearErrors();
-        		var selectValue = this.getValue();
-        		if ( selectValue !== null && selectValue.length > 0 ){
-        			if ( this.m_id !== null ){
-
-        				var path = skel.widgets.Path.getInstance();
-        				var cmd = this.m_id + path.SEP_COMMAND + this.m_cmd;
-
-        				var params = this.m_paramId + ":"+selectValue;
-        				this.m_connector.sendCommand( cmd, params, function(){});
-        			}
-        			this.fireDataEvent( "selectChanged", null );
-        		}
-        	}
+            var errorMan = skel.widgets.ErrorHandler.getInstance();
+            errorMan.clearErrors();
+            var selectValue = this.getValue();
+            if ( selectValue !== null && selectValue.length > 0 ){
+                if ( this.m_id !== null ){
+                
+                    var path = skel.widgets.Path.getInstance();
+                    var cmd = this.m_id + path.SEP_COMMAND + this.m_cmd;
+                
+                    var params = this.m_paramId + ":"+selectValue;
+                    this.m_connector.sendCommand( cmd, params, function(){});
+                }
+                this.fireDataEvent( "selectChanged", null );
+            }
         },
-
-        /**
-         * Update the list of select box items.
-         * @param items {Array} the new select items to display.
-         */
-       setSelectItemsShowFirstSelected : function ( items ){
-           this.removeListenerById( this.m_selectListener );
-           this.removeAll();
-           var selection = [];
-           for ( var i = 0; i < items.length; i++ ){
-               var newValue = items[i]+"";
-               var tempItem = new qx.ui.form.ListItem( newValue );
-               this.add( tempItem );
-           }
-
-            //Try to reset the old selection
-            //    if ( oldValue !== null ){
-            //        console.log("grimmer colormap, olvValue != null");
-            //        if ( items.length > 0 ){
-            //            this.setSelection( selection );
-            //        }
-            //    }
-
-           // Select the first item
-           if ( items.length > 0 ){
-               var selectables = this.getSelectables(true);
-               if ( selectables.length > 0 ){
-                   var selection = [];
-                   selection.push( selectables[0])
-                   this.setSelection( selection );
-               }
-           }
-
-           this.m_selectListener =this.addListener( "changeSelection",
-                   this._sendCmd, this );
-       },
-
+        
         /**
          * Update the list of select box items.
          * @param items {Array} the new select items to display.
@@ -136,16 +96,16 @@ qx.Class.define("skel.widgets.CustomUI.SelectBox", {
            var selection = [];
            for ( var i = 0; i < items.length; i++ ){
                var newValue = items[i]+"";
-
+              
                var tempItem = new qx.ui.form.ListItem( newValue );
                if ( newValue == oldValue ){
                    selection.push( tempItem );
                }
                this.add( tempItem );
            }
-
+          
            //Try to reset the old selection
-           if ( oldValue !== null ){
+           if ( oldValue !== null ){ 
                if ( items.length > 0 ){
                    this.setSelection( selection );
                }
@@ -159,8 +119,7 @@ qx.Class.define("skel.widgets.CustomUI.SelectBox", {
                    this.setSelection( selection );
                }
            }
-
-           this.m_selectListener =this.addListener( "changeSelection",
+           this.m_selectListener =this.addListener( "changeSelection", 
                    this._sendCmd, this );
        },
 
@@ -184,7 +143,7 @@ qx.Class.define("skel.widgets.CustomUI.SelectBox", {
                         selections.push( selectables[i] );
                         this.setSelection( selections );
                         if ( !notify ){
-                            this.m_selectListener =this.addListener( "changeSelection",
+                            this.m_selectListener =this.addListener( "changeSelection", 
                                 this._sendCmd, this );
                         }
                     }
@@ -192,9 +151,9 @@ qx.Class.define("skel.widgets.CustomUI.SelectBox", {
                 }
             }
         },
-
-
-
+        
+        
+        
         /**
          * Set the server side id of this control UI.
          * @param id {String} the server side id of the object.
@@ -202,7 +161,7 @@ qx.Class.define("skel.widgets.CustomUI.SelectBox", {
         setId : function( id ){
             this.m_id = id;
         },
-
+        
         m_id : null,
         m_connector : null,
         m_cmd : null,

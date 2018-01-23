@@ -8,7 +8,6 @@
 #include "CartaLib/AxisDisplayInfo.h"
 #include "CartaLib/CartaLib.h"
 #include "CartaLib/AxisInfo.h"
-#include "CartaLib/IntensityUnitConverter.h"
 
 #include <memory>
 
@@ -17,24 +16,23 @@ class SliceND;
 
 namespace Carta {
 namespace Lib {
-namespace PixelPipeline {
-class CustomizablePixelPipeline;
-}
-namespace Image {
-class ImageInterface;
-}
-namespace NdArray {
-class RawViewInterface;
-}
-class IPCache;
+    namespace PixelPipeline {
+        class CustomizablePixelPipeline;
+    }
+    namespace Image {
+        class ImageInterface;
+    }
+    namespace NdArray {
+        class RawViewInterface;
+    }
 }
 
 
 
 namespace Core {
-namespace ImageRenderService {
-class Service;
-}
+    namespace ImageRenderService {
+        class Service;
+    }
 }
 
 namespace Data {
@@ -43,20 +41,20 @@ class CoordinateSystems;
 
 class DataSource : public QObject {
 
-    friend class LayerData;
-    friend class DataFactory;
-    friend class Histogram;
-    friend class Profiler;
-    friend class Colormap;
+friend class LayerData;
+friend class DataFactory;
+friend class Histogram;
+friend class Profiler;
+friend class Colormap;
 
-    Q_OBJECT
+Q_OBJECT
 
 public:
 
 
-    static const QString CLASS_NAME;
-    static const double ZOOM_DEFAULT;
-    static const QString DATA_PATH;
+       static const QString CLASS_NAME;
+       static const double ZOOM_DEFAULT;
+       static const QString DATA_PATH;
 
     virtual ~DataSource();
 
@@ -82,9 +80,6 @@ private:
      * @return - a list of axes that are present in the image.
      */
     std::vector<Carta::Lib::AxisInfo::KnownType> _getAxisTypes() const;
-
-
-    std::vector<Carta::Lib::AxisInfo> _getAxisInfos() const;
 
     /**
      * Returns the type of the axis with the given index in the image.
@@ -113,35 +108,41 @@ private:
     std::vector<Carta::Lib::AxisInfo::KnownType> _getAxisZTypes() const;
 
     /**
+     * Return the number of frames for a particular axis in the image.
+     * @param type - the axis for which a frame count is needed.
+     * @return the number of frames for the given axis in the image.
+     */
+    int _getFrameCount( Carta::Lib::AxisInfo::KnownType type ) const;
+
+    /**
+     * Return the number of dimensions in the image.
+     * @return the number of image dimensions.
+     */
+    int _getDimensions() const;
+
+    /**
+     * Returns the location on the image corresponding to a screen point in
+     * pixels.
+     * @param screenPt an (x,y) pair of pixel coordinates.
+     * @param valid set to true if an image is loaded that can do the translation; otherwise false;
+     * @return the corresponding location on the image.
+     */
+    QPointF _getImagePt( QPointF screenPt, bool* valid ) const;
+    
+    /**
+     * Returns the location on the screen corresponding to a location in image coordinates.
+     * @param imagePt an (x,y) pair of image coordinates.
+     * @param valid set to true if an image is loaded that can do the translation; otherwise false;
+     * @return the corresponding pixel coordinates.
+     */
+    QPointF _getScreenPt( QPointF imagePt, bool* valid ) const;
+
+    /**
      * Return the current pan center.
      * @return the centered image location.
      */
     QPointF _getCenter() const;
-
-    /**
-     * Return the coordinates at pixel (x, y) in the given coordinate system.
-     * @param x the x-coordinate of the desired pixel.
-     * @param y the y-coordinate of the desired pixel.
-     * @param system the desired coordinate system.
-     * @param frames - a list of current image frames.
-     * @return a list formatted coordinates.
-     */
-    QStringList _getCoordinates( double x, double y, Carta::Lib::KnownSkyCS system,
-            const std::vector<int>& frames) const;
-
-
-    QString _getSkyCS();
-
-    /**
-     * Returns information about the image at the current location of the cursor.
-     * @param mouseX the mouse x-position in screen coordinates.
-     * @param mouseY the mouse y-position in screen coordinates.
-     * @param frames - a list of current image frames.
-     * @return a QString containing cursor text.
-     */
-    QString _getCursorText(bool isAutoClip, double minPercent, double maxPercent, int mouseX, int mouseY, Carta::Lib::KnownSkyCS cs, const std::vector<int>& frames,
-            double zoom, const QPointF& pan, const QSize& outputSize );
-
+    
 
     /**
      * Return the image size for the given coordinate index.
@@ -151,10 +152,24 @@ private:
     int _getDimension( int coordIndex ) const;
 
     /**
-     * Return the number of dimensions in the image.
-     * @return the number of image dimensions.
+     * Returns the underlying image.
      */
-    int _getDimensions() const;
+    std::shared_ptr<Carta::Lib::Image::ImageInterface> _getImage();
+
+    /**
+     * Returns the image's file name.
+     * @return the path to the image.
+     */
+    QString _getFileName() const;
+    
+    /**
+     * Returns information about the image at the current location of the cursor.
+     * @param mouseX the mouse x-position in screen coordinates.
+     * @param mouseY the mouse y-position in screen coordinates.
+     * @param frames - a list of current image frames.
+     * @return a QString containing cursor text.
+     */
+    QString _getCursorText( int mouseX, int mouseY, Carta::Lib::KnownSkyCS cs, const std::vector<int>& frames);
 
     /**
      * Returns the number of frames in the horizontal and vertical display directions,
@@ -162,20 +177,6 @@ private:
      * @return - a pair consisting of frame counts on the horizontal and vertical axis.
      */
     std::pair<int,int> _getDisplayDims() const;
-
-    /**
-     * Returns the image's file name.
-     * @return the path to the image.
-     */
-    QString _getFileName() const;
-
-
-    /**
-     * Return the number of frames for a particular axis in the image.
-     * @param type - the axis for which a frame count is needed.
-     * @return the number of frames for the given axis in the image.
-     */
-    int _getFrameCount( Carta::Lib::AxisInfo::KnownType type ) const;
 
     /**
      * Get the index of the current frame of the axis specified by the sourceFrameIndex.
@@ -186,83 +187,31 @@ private:
     int _getFrameIndex( int sourceFrameIndex, const std::vector<int>& sourceFrames ) const;
 
     /**
-     * Get the permutation order of the datacube.
-     * @return - the permutation order of the datacube.
+     * Return the percentile corresponding to the given intensity.
+     * @param frameLow a lower bound for the frames or -1 if there is no lower bound.
+     * @param frameHigh an upper bound for the frames or -1 if there is no upper bound.
+     * @param intensity a value for which a percentile is needed.
+     * @return the percentile corresponding to the intensity.
      */
-    std::vector<int> _getPermOrder() const;
-
+    double _getPercentile( int frameLow, int frameHigh, double intensity ) const;
+    
     /**
-     * Returns the underlying image.
-     */
-    std::shared_ptr<Carta::Lib::Image::ImageInterface> _getImage();
-    std::shared_ptr<Carta::Lib::Image::ImageInterface> _getPermImage();
-
-    /**
-     * Returns the location on the image corresponding to a screen point in
-     * pixels.
-     * @param screenPt an (x,y) pair of pixel coordinates.
-     * @param zoom - the zoom factor.
-     * @param pan - the point where the image should be centered.
-     * @param outputSize - the size in pixels of the produced image.
-     * @param valid set to true if an image is loaded that can do the translation; otherwise false;
-     * @return the corresponding location on the image.
-     */
-    QPointF _getImagePt( const QPointF& screenPt, double zoom, const QPointF& pan,
-            const QSize& outputSize, bool* valid ) const;
-
-    /**
-     * check if the "inputValue" is amoung the vector of "comparedValue",
-     * if true, return the original value from "comparedValue"
-     */
-    std::pair<bool, double> _isSameValue(double inputValue, std::vector<double> comparedValue, double threshold) const;
-
-    /**
-     * Returns the bool and intensity corresponding to a percentile value.
+     * Returns the intensity corresponding to a given percentile.
      * @param frameLow - a lower bound for the image channels or -1 if there is no lower bound.
      * @param frameHigh - an upper bound for the image channels or -1 if there is no upper bound.
-     * @param percentiles - a list of numbers in [0,1] for which an intensity is desired.
-     * @param stokeFrame - the index number of stoke slice
-     * @return - a corresponding percentile (bool, intensity) pair.
-     *           If bool is true, the intensity cache exists and we can read the cache value.
-     *           If bool is false, the intensity cache does not exist and returns the default value -1.
+     * @param percentile - a number [0,1] for which an intensity is desired.
+     * @param intensity - the computed intensity corresponding to the percentile.
+     * @param intensityIndex - location where the maximum intensity was found.
+     * @return true if the computed intensity is valid; otherwise false.
      */
-    std::pair<double, double> _readIntensityCache(int frameLow, int frameHigh, double percentile, int stokeFrame, QString transformation_label) const;
-
-    void _setIntensityCache(double intensity, double error, int frameLow, int frameHigh, double percentile, int stokeFrame, QString transformation_label) const;
-
-
-    /**
-     * Returns the intensities corresponding to a given percentiles.
-     * @param frameLow - a lower bound for the image channels or -1 if there is no lower bound.
-     * @param frameHigh - an upper bound for the image channels or -1 if there is no upper bound.
-     * @param percentiles - a list of numbers in [0,1] for which an intensity is desired.
-     * @param stokeFrame - the index number of stoke slice
-     * @return - a list of intensity values.
-     */
-    std::vector<double> _getIntensity( int frameLow, int frameHigh,
-            const std::vector<double>& percentiles, int stokeFrame,
-            Carta::Lib::IntensityUnitConverter::SharedPtr converter);
-
-
+    bool _getIntensity( int frameLow, int frameHigh, double percentile,
+            double* intensity, int* locationIndex ) const;
+    
     /**
      * Returns the color used to draw nan pixels.
      * @return - the color used to draw nan pixels.
      */
     QColor _getNanColor() const;
-
-    std::vector<double> _getHertzValues(const std::vector<int> dims, const int spectralIndex) const;
-
-    /**
-     * Return percentiles corresponding to the given intensities.
-     * @param frameLow a lower bound for the channel range or -1 if there is no lower bound.
-     * @param frameHigh an upper bound for the channel range or -1 if there is no upper bound.
-     * @param intensities values for which percentiles are needed.
-     * @return the percentiles corresponding to the intensities.
-     */
-    std::vector<double> _getPercentiles( int frameLow, int frameHigh, std::vector<double> intensities, Carta::Lib::IntensityUnitConverter::SharedPtr converter ) const;
-
-
-    std::shared_ptr<Carta::Lib::Image::ImageInterface> _getPermutedImage() const;
 
     /**
      * Returns the pipeline responsible for rendering the image.
@@ -270,37 +219,28 @@ private:
      */
     std::shared_ptr<Carta::Lib::PixelPipeline::CustomizablePixelPipeline> _getPipeline() const;
 
+    std::shared_ptr<Carta::Core::ImageRenderService::Service> _getRenderer() const;
+
+    /**
+     * Return the zoom factor for this image.
+     * @return the zoom multiplier.
+     */
+    double _getZoom() const;
+
+    /**
+     * Get the dimensions of the image viewer (window size).
+     * @return the image viewer dimensions.
+     */
+    QSize _getOutputSize() const;
+
     /**
      * Return the pixel coordinates corresponding to the given world coordinates.
-     * @param ra - the right ascension (in radians) of the world coordinates.
-     * @param dec - the declination (in radians) of the world coordinates.
-     * @param valid - true if the pixel coordinates are valid; false otherwise.
-     * @return - a point containing the pixel coordinates.
+     * @param ra the right ascension (in radians) of the world coordinates.
+     * @param dec the declination (in radians) of the world coordinates.
+     * @return a list consisting of the x- and y-coordinates of the pixel
+     *  corresponding to the given world coordinates.
      */
-    QPointF _getPixelCoordinates( double ra, double dec, bool* valid ) const;
-
-    /**
-     * Return the rest frequency and units for the image.
-     * @return - the image rest frequency and units; a blank string and a negative
-     * 		value are returned with the rest frequency can not be found.
-     */
-    std::pair<double,QString> _getRestFrequency() const;
-
-    /**
-     * Return the world coordinates corresponding to the given pixel coordinates.
-     * @param pixelX - the first pixel coordinate.
-     * @param pixelY - the second pixel coordinate.
-     * @param valid - true if the pixel coordinates are valid; false otherwise.
-     * @return - a point containing the pixel coordinates.
-     */
-    QPointF _getWorldCoordinates( double pixelX, double pixelY,
-            Carta::Lib::KnownSkyCS coordSys, bool* valid ) const;
-
-    /**
-     * Return the units of the pixels.
-     * @return the units of the pixels, or blank if units could not be obtained.
-     */
-    QString _getPixelUnits() const;
+    QStringList _getPixelCoordinates( double ra, double dec ) const;
 
     /**
      * Return the value of the pixel at (x, y).
@@ -314,9 +254,23 @@ private:
      */
     QString _getPixelValue( double x, double y, const std::vector<int>& frames ) const;
 
-    std::vector<int> _getStokeIndex( const std::vector<int>& frames ) const;
+    /**
+     * Return the units of the pixels.
+     * @return the units of the pixels, or blank if units could not be obtained.
+     */
+    QString _getPixelUnits() const;
 
-    std::vector<int> _getChannelIndex( const std::vector<int>& frames ) const;
+    /**
+     * Return the coordinates at pixel (x, y) in the given coordinate system.
+     * @param x the x-coordinate of the desired pixel.
+     * @param y the y-coordinate of the desired pixel.
+     * @param system the desired coordinate system.
+     * @param frames - a list of current image frames.
+     * @return a list formatted coordinates.
+     */
+    QStringList _getCoordinates( double x, double y, Carta::Lib::KnownSkyCS system,
+           const std::vector<int>& frames) const;
+
 
     /**
      * Returns the raw data as an array.
@@ -329,49 +283,20 @@ private:
     Carta::Lib::NdArray::RawViewInterface *  _getRawData( int frameLow, int frameHigh, int axisIndex ) const;
 
     /**
-     * Returns the raw data as an array.
-     * @param axisIndex - an index of an image axis.
-     * @param frameLow the lower bound for the frames or -1 for the whole image.
-     * @param frameHigh the upper bound for the frames or -1 for the whole image.
-     * @param axisIndex - the axis for the frames or -1 for all axes.
-     * @param axisStokeIndex - the axis for the stoke frame.
-     * @param stokeSliceIndex - the index of the stoke frame (-1: no stoke, 0: stoke I, 1: stoke Q, 2: stoke U, 3: stoke V).
-     * @return the raw data or nullptr if there is none.
-     */
-    Carta::Lib::NdArray::RawViewInterface *  _getRawDataForStoke( int frameLow, int frameHigh, int axisIndex,
-            int axisStokeIndex, int stokeSliceIndex ) const;
-
-    /**
      * Returns the raw data for the current view.
      * @param frames - a list of current image frames.
      * @return the raw data for the current view or nullptr if there is none.
      */
     Carta::Lib::NdArray::RawViewInterface* _getRawData( const std::vector<int> frames ) const;
 
-    std::shared_ptr<Carta::Core::ImageRenderService::Service> _getRenderer() const;
-
-    /**
-     * Returns the location on the screen corresponding to a location in image coordinates.
-     * @param imagePt an (x,y) pair of image coordinates.
-     * @param valid set to true if an image is loaded that can do the translation; otherwise false;
-     * @return the corresponding pixel coordinates.
-     */
-    QPointF _getScreenPt( const QPointF& imagePt, const QPointF& pan, double zoom,
-            const QSize& outputSize, bool* valid ) const;
-
+    std::shared_ptr<Carta::Lib::Image::ImageInterface> _getPermutedImage() const;
 
     //Returns an identifier for the current image slice being rendered.
     QString _getViewIdCurrent( const std::vector<int>& frames ) const;
-
+    int _getQuantileCacheIndex( const std::vector<int>& frames ) const;
 
     //Initialize static objects.
     void _initializeSingletons( );
-
-    ///Returns whether the frames actually exist in the image.
-    bool _isLoadable( std::vector<int> frames ) const;
-
-    //Returns whether or not there is a spectral axis in the image.
-    bool _isSpectralAxis() const;
 
     /**
      * Generate a QImage representation of this data.
@@ -394,32 +319,34 @@ private:
      */
     void _resetZoom();
 
+    void _resizeQuantileCache();
+
     /**
-     * Sets a new color map.
-     * @param name the identifier for the color map.
-     */
+    * Sets a new color map.
+    * @param name the identifier for the color map.
+    */
     void _setColorMap( const QString& name );
 
-    /**
-     * Sets whether the colors in the map are inverted.
-     * @param inverted true if the colors in the map are inverted; false
-     *        otherwise.
-     */
+   /**
+    * Sets whether the colors in the map are inverted.
+    * @param inverted true if the colors in the map are inverted; false
+    *        otherwise.
+    */
     void _setColorInverted( bool inverted );
 
-    /**
-     * Sets whether the colors in the map are reversed.
-     * @param reversed true if the colors in the map are reversed; false
-     *        otherwise.
-     */
+   /**
+    * Sets whether the colors in the map are reversed.
+    * @param reversed true if the colors in the map are reversed; false
+    *        otherwise.
+    */
     void _setColorReversed( bool reversed );
 
-    /**
-     * Set the amount of red, green, and blue in the color scale.
-     * @param newRed the amount of red; should be in the range [0,1].
-     * @param newGreen the amount of green; should be in the range [0,1].
-     * @param newBlue the amount of blue; should be in the range[0,1].
-     */
+   /**
+    * Set the amount of red, green, and blue in the color scale.
+    * @param newRed the amount of red; should be in the range [0,1].
+    * @param newGreen the amount of green; should be in the range [0,1].
+    * @param newBlue the amount of blue; should be in the range[0,1].
+    */
     void _setColorAmounts( double newRed, double newGreen, double newBlue );
 
     /**
@@ -436,7 +363,7 @@ private:
      * @param frames - a list of current image frames.
      */
     void _setDisplayAxes(std::vector<Carta::Lib::AxisInfo::KnownType> displayAxisTypes,
-            const std::vector<int>& frames );
+             const std::vector<int>& frames );
 
     /**
      * Set a particular axis type to be one of the display axes.
@@ -503,8 +430,6 @@ private:
      */
     void _viewResize( const QSize& newSize );
 
-    std::vector<double> _getQuantileIntensityCache( std::shared_ptr<Carta::Lib::NdArray::RawViewInterface>& view,
-            double minClipPercentile, double maxClipPercentile, const std::vector<int>& frames, bool showMesg );
 
     void _updateClips( std::shared_ptr<Carta::Lib::NdArray::RawViewInterface>& view,
             double minClipPercentile, double maxClipPercentile, const std::vector<int>& frames );
@@ -515,6 +440,8 @@ private:
     DataSource();
 
     QString m_fileName;
+    bool m_cmapUseCaching;
+    bool m_cmapUseInterpolatedCaching;
     int m_cmapCacheSize;
 
     //Used pointer to coordinate systems.
@@ -527,25 +454,18 @@ private:
     /// coordinate formatter
     std::shared_ptr<CoordinateFormatterInterface> m_coordinateFormatter;
 
+    /// clip cache, hard-coded to single quantile
+    std::vector< std::vector<double> > m_quantileCache;
+
     /// the rendering service
     std::shared_ptr<Carta::Core::ImageRenderService::Service> m_renderService;
 
     ///pixel pipeline
     std::shared_ptr<Carta::Lib::PixelPipeline::CustomizablePixelPipeline> m_pixelPipeline;
-    
-    // disk cache
-    std::shared_ptr<Carta::Lib::IPCache> m_diskCache;
-    
+
     //Indices of the display axes.
     int m_axisIndexX;
     int m_axisIndexY;
-
-    const static int INDEX_LOCATION;
-    const static int INDEX_INTENSITY;
-    const static int INDEX_PERCENTILE;
-    const static int INDEX_FRAME_LOW;
-    const static int INDEX_FRAME_HIGH;
-    const static bool APPROXIMATION_GET_LOCATION;
 
     DataSource(const DataSource& other);
     DataSource& operator=(const DataSource& other);

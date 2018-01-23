@@ -14,9 +14,8 @@ dbg( "===---------------------------------------------====")
 
 TEMPLATE = subdirs
 SUBDIRS += cpp
-SUBDIRS += config
-# SUBDIRS += scriptedClient
-# SUBDIRS += scripts
+SUBDIRS += scriptedClient
+SUBDIRS += scripts
 
 OTHER_FILES += readme.txt uncrustify.cfg
 
@@ -24,7 +23,7 @@ OTHER_FILES += readme.txt uncrustify.cfg
 # make sure user did not specify debug version...
 # it's probably harmless, but that's probably not what the user wanted
 CONFIG(debug,debug|release) {
-    message( "Please don't specify debug version like this!")
+    error( "Please don't specify debug version like this!")
 }
 
 CONFIG(release,debug|release) {

@@ -49,11 +49,7 @@ public:
      */
     QString getName() const;
 
-    /**
-     * Return the type of the contour set.
-     * @return - the type of the contour set.
-     */
-    QString getContourType() const;
+
 
     /**
      * Returns the set of pens used to draw contours.

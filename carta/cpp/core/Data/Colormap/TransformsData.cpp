@@ -10,13 +10,11 @@ namespace Data {
 
 const QString TransformsData::DATA_TRANSFORMS = "dataTransforms";
 const QString TransformsData::CLASS_NAME = "TransformsData";
-const QString TransformsData::TRANSFORM_NONE = "Linear";
+const QString TransformsData::TRANSFORM_NONE = "None";
 const QString TransformsData::TRANSFORM_ROOT = "Square Root";
 const QString TransformsData::TRANSFORM_SQUARE = "Square";
 const QString TransformsData::TRANSFORM_LOG = "Logarithm";
-const QString TransformsData::TRANSFORM_POLY3 = "Polynomial3";
-const QString TransformsData::TRANSFORM_POLY4 = "Polynomial4";
-
+const QString TransformsData::TRANSFORM_POLY = "Polynomial";
 
 class TransformsData::Factory : public Carta::State::CartaObjectFactory {
 
@@ -64,9 +62,7 @@ void TransformsData::_initializeDefaultState(){
     m_transforms.push_back(TRANSFORM_ROOT);
     m_transforms.push_back(TRANSFORM_SQUARE);
     m_transforms.push_back(TRANSFORM_LOG);
-    m_transforms.push_back(TRANSFORM_POLY3);
-    m_transforms.push_back(TRANSFORM_POLY4);
-
+    m_transforms.push_back(TRANSFORM_POLY );
 
     int transformCount = m_transforms.size();
     m_state.insertArray( DATA_TRANSFORMS, transformCount );
@@ -97,11 +93,8 @@ Carta::Lib::PixelPipeline::ScaleType TransformsData::getScaleType( const QString
     if ( name == TRANSFORM_LOG ){
         scaleType = Carta::Lib::PixelPipeline::ScaleType::Log;
     }
-    else if ( name == TRANSFORM_POLY3){
-        scaleType = Carta::Lib::PixelPipeline::ScaleType::Polynomial3;
-    }
-    else if ( name == TRANSFORM_POLY4){
-        scaleType = Carta::Lib::PixelPipeline::ScaleType::Polynomial4;
+    else if ( name == TRANSFORM_POLY ){
+        scaleType = Carta::Lib::PixelPipeline::ScaleType::Polynomial;
     }
     else if ( name == TRANSFORM_SQUARE ){
         scaleType = Carta::Lib::PixelPipeline::ScaleType::Sqr;

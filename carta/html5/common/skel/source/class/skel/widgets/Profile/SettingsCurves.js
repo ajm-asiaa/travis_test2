@@ -14,7 +14,6 @@ qx.Class.define("skel.widgets.Profile.SettingsCurves", {
      */
     construct : function( ) {
         this.base(arguments, "Curves", "");
-        this.m_colorAppeared = false;
         this._init();
         
         //Initiate connector.
@@ -44,12 +43,8 @@ qx.Class.define("skel.widgets.Profile.SettingsCurves", {
         dataUpdate : function( curveUpdate ){
             this.m_curveInfo = curveUpdate.curves;
             var curveNames = [];
-            var j = 0;
             for ( var i = 0; i < this.m_curveInfo.length; i++ ){
-            	if ( this.m_curveInfo[i].active ){
-            		curveNames[j] = this.m_curveInfo[i].name;
-            		j++;
-            	}
+                curveNames[i] = this.m_curveInfo[i].name;
             }
             this.m_curveList.setItems( curveNames );
             this._updateColor();
@@ -82,23 +77,21 @@ qx.Class.define("skel.widgets.Profile.SettingsCurves", {
             
             var styleContainer = new qx.ui.container.Composite();
             styleContainer.setLayout( new qx.ui.layout.HBox(1));
-             var styleLabel = new qx.ui.basic.Label( "Style:");
+            var styleLabel = new qx.ui.basic.Label( "Style:");
             this.m_lineCombo = new skel.widgets.CustomUI.SelectBox();
             this.m_lineCombo.setToolTipText( "Select a plot style for the curve.");
             this.m_lineCombo.addListener( "selectChanged", this._sendStylePlotCmd, this );
             this.m_styleCombo = new skel.widgets.CustomUI.SelectBox();
             this.m_styleCombo.setToolTipText( "Select a line style for the curve.");
             this.m_styleCombo.addListener( "selectChanged", this._sendStyleChangeCmd, this );
+            styleContainer.add( new qx.ui.core.Spacer(5), {flex:1});
             styleContainer.add( styleLabel );
-            styleContainer.add( this.m_styleCombo );
             styleContainer.add( this.m_lineCombo );
+            styleContainer.add( this.m_styleCombo );
+            styleContainer.add( new qx.ui.core.Spacer(5), {flex:1});
             curveContainer.add( styleContainer );
             
             this.m_colorSelector = new skel.widgets.CustomUI.ColorSelector();
-            this.m_colorSelector.addListener("appear", function() {
-                this.m_colorAppeared = true;
-                this._updateColor();
-            }, this );
             this.m_colorListenerId = this.m_colorSelector.addListener( "changeValue", this._sendColorChangeCmd, this );
             curveContainer.add( this.m_colorSelector );
             
@@ -179,9 +172,6 @@ qx.Class.define("skel.widgets.Profile.SettingsCurves", {
             }
         },
         
-        /**
-         * Send the new plot style to the server.
-         */
         _sendStylePlotCmd : function(){
             if ( this.m_id !== null ){
                 var style = this.m_lineCombo.getValue();
@@ -210,29 +200,26 @@ qx.Class.define("skel.widgets.Profile.SettingsCurves", {
         _updateColor : function(){
             if ( this.m_curveList !== null && this.m_colorSelector !== null &&
                     this.m_curveInfo !== null ){
-                if ( this.m_colorAppeared ){
-                    this.m_colorSelector.removeListenerById( this.m_colorListenerId );
-                    var curveIndex = this.m_curveList.getSelectedIndex();
-                    if ( curveIndex < this.m_curveInfo.length ){
-                        var oldRed = this.m_colorSelector.getRed();
-                        var newRed = this.m_curveInfo[curveIndex].red;
-                        if ( oldRed != newRed ){
-                            this.m_colorSelector.setRed( newRed );
-                        }
-                        var oldGreen = this.m_colorSelector.getGreen();
-                        var newGreen = this.m_curveInfo[curveIndex].green;
-                        if ( oldGreen != newGreen ){
-                            this.m_colorSelector.setGreen( newGreen );
-                        }
-                        var oldBlue = this.m_colorSelector.getBlue();
-                        var newBlue = this.m_curveInfo[curveIndex].blue;
-                        if ( oldBlue != newBlue ){
-                            this.m_colorSelector.setBlue( newBlue );
-                        }
+                this.m_colorSelector.removeListenerById( this.m_colorListenerId );
+                var curveIndex = this.m_curveList.getSelectedIndex();
+                if ( curveIndex < this.m_curveInfo.length ){
+                    var oldRed = this.m_colorSelector.getRed();
+                    var newRed = this.m_curveInfo[curveIndex].red;
+                    if ( oldRed != newRed ){
+                        this.m_colorSelector.setRed( newRed );
                     }
-                    this.m_colorListenerId = this.m_colorSelector.addListener( "changeValue", 
-                            this._sendColorChangeCmd, this );
+                    var oldGreen = this.m_colorSelector.getGreen();
+                    var newGreen = this.m_curveInfo[curveIndex].green;
+                    if ( oldGreen != newGreen ){
+                        this.m_colorSelector.setGreen( newGreen );
+                    }
+                    var oldBlue = this.m_colorSelector.getBlue();
+                    var newBlue = this.m_curveInfo[curveIndex].blue;
+                    if ( oldBlue != newBlue ){
+                        this.m_colorSelector.setBlue( newBlue );
+                    }
                 }
+                this.m_colorListenerId = this.m_colorSelector.addListener( "changeValue", this._sendColorChangeCmd, this );
             }
         },
         
@@ -260,7 +247,6 @@ qx.Class.define("skel.widgets.Profile.SettingsCurves", {
         },
         
         m_id : null,
-        m_colorAppeared : null,
         m_connector : null,
         m_curveList : null,
         m_curveInfo : null,

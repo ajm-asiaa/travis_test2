@@ -7,7 +7,7 @@
 
 #include <memory>
 
-namespace casacore {
+namespace casa {
     template <class T> class ImageInterface;
     template <class T> class LatticeHistograms;
     template <class T> class SubImage;
@@ -30,7 +30,7 @@ public:
     virtual bool compute() Q_DECL_OVERRIDE;
 
 	int getDataCount() const;
-	void setRegion(casacore::ImageRegion* region, const QString& id );
+	void setRegion(casa::ImageRegion* region);
 	void defineLine( int index, QVector<double>& xVals, QVector<double>& yVals,
 			bool useLogY ) const;
 	void defineStepHorizontal( int index, QVector<double>& xVals, QVector<double>& yVals,
@@ -53,10 +53,8 @@ public:
 
 	void setIntensityRange( double minimumIntensity, double maximumIntensity )  Q_DECL_OVERRIDE;
 
-	void setImage(const casacore::ImageInterface<T>*  val);
+	void setImage(const casa::ImageInterface<T>*  val);
 	static double computeYValue( double value, bool useLog );
-
-
 	virtual ~ImageHistogram();
 
 private:
@@ -64,19 +62,18 @@ private:
 	ImageHistogram operator=( const ImageHistogram<T>& other );
 	//Completely reset the histogram if the image, region, or channels change
 	bool _reset();
-	void _filterByChannels( const casacore::ImageInterface<T>*  image );
+	void _filterByChannels( const casa::ImageInterface<T>*  image );
 
 	vector<T> m_xValues;
 	vector<T> m_yValues;
-	casacore::LatticeHistograms<T>* m_histogramMaker;
-	casacore::ImageRegion* m_region;
+	casa::LatticeHistograms<T>* m_histogramMaker;
+	casa::ImageRegion* m_region;
 	const int ALL_CHANNELS;
 	const int ALL_INTENSITIES;
-    const casacore::ImageInterface<T>*  m_image; //Use
+    const casa::ImageInterface<T>*  m_image; //Use
 	int m_channelMin;
 	int m_channelMax;
 	double m_intensityMin;
 	double m_intensityMax;
 	int m_binCount;
-	QString m_regionId;
 };

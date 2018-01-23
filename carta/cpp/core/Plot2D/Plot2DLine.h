@@ -76,7 +76,6 @@ private:
 
 	//Position of the line in pixel coordinates.
 	int m_positionPixel;
-	int m_positionPixelMin;
 
 	//Used to keep track of the current draw position, in world coordinates,
 	//which may be different from the m_position if the users is dragging the

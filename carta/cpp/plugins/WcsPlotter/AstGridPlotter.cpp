@@ -4,6 +4,9 @@
 
 #include <string.h>
 #include <locale.h>
+extern "C" {
+#include <ast.h>
+};
 
 namespace WcsPlotterPluginNS
 {
@@ -31,13 +34,17 @@ AstGridPlotter::getError()
     return m_errorString;
 }
 
-/// This part of code will be removed in the future
-/*
 AstFrameSet * AstGridPlotter::_make2dFrame( AstFrameSet* wcsinfo ){
     AstFrameSet * result = nullptr;
-    bool celestialPlane = Carta::Lib::AxisDisplayInfo::isCelestialPlane( m_axisDisplayInfos );
-    if ( !celestialPlane ){
-        result = _make2dFrameCelestialExclude( wcsinfo );
+    bool permuteAxes = Carta::Lib::AxisDisplayInfo::isPermuted( m_axisDisplayInfos );
+    if ( permuteAxes ){
+        bool celestialPlane = Carta::Lib::AxisDisplayInfo::isCelestialPlane( m_axisDisplayInfos );
+        if ( celestialPlane ){
+            result = _make2dFrameCelestial( wcsinfo );
+        }
+        else {
+            result = _make2dFrameCelestialExclude( wcsinfo );
+        }
     }
     else {
         result = wcsinfo;
@@ -125,7 +132,7 @@ AstFrameSet * AstGridPlotter::_make2dFrameSet( AstFrameSet *fs,
                     double* work2 = static_cast<double*>( astMalloc( axisCount*nsamp*sizeof( double ) ) );
                     if( work2 ) {
 
-                        // Transform the pixel positions into world coordinates.
+                        // Transform the pixel positions into world coordinates. */
                         //astSetI( fs, "Report", 1 );
                         astTranN( fs, nsamp, axisCount, nsamp, work1, 1, axisCount, nsamp, work2 );
                         //astSetI( fs, "Report", 0 );
@@ -229,6 +236,122 @@ AstFrameSet * AstGridPlotter::_make2dFrameSet( AstFrameSet *fs,
     return result;
 }
 
+
+AstFrameSet* AstGridPlotter::_make2dFrameCelestial( AstFrameSet* wcsinfo ){
+    AstFrameSet* result = nullptr;
+
+    astBegin;
+
+    int axesCount = astGetI( wcsinfo, "NAxes" );
+    int displayInfosSize = m_axisDisplayInfos.size();
+    if ( axesCount == displayInfosSize ){
+
+       //Initialize the display axes.
+       int displayAxesCount = 2;
+       int axes[displayAxesCount];
+       int displayIndex = 0;
+       for ( int j = 0; j < displayInfosSize; j++ ){
+          //Display axis.
+          if ( m_axisDisplayInfos[j].getFrame() == -1 ){
+              axes[displayIndex] = j+1;
+              displayIndex++;
+              if ( displayIndex == displayAxesCount ){
+                  break;
+              }
+          }
+       }
+
+       //Create the lutmap for each display axis.
+       std::vector<AstLutMap* > lutMaps(displayAxesCount);
+       for ( int k = 0; k < displayAxesCount; k++ ){
+         lutMaps[k] = nullptr;
+       }
+       for ( int k= 0; k < displayAxesCount; k++ ){
+           int targetAxis = axes[k] -1;
+           int nsamp = m_axisDisplayInfos[targetAxis].getFrameCount();
+           if ( targetAxis >= 0 ){
+               double *work1 = static_cast<double*>( astMalloc( axesCount*nsamp*sizeof( double ) ) );
+               if( work1 ) {
+                   // Fill the above array with the pixel positions. The values for the
+                   // celestial pixel axis not being mapped are set to 1.
+                   // The values for fixed axes are set to their current frames. The values for
+                   // the celestial pixel axis targeted for the map are set to [1,2,3,...,naxisn].
+                   for( int i = 0; i < nsamp; i++ ) {
+                       for ( int j = 0; j < axesCount; j++ ){
+                           int workIndex = j * nsamp + i;
+                           if ( j== targetAxis ){
+                               work1[ workIndex ] = i + 1;
+                           }
+                           else if ( j== axes[0] - 1 || j == axes[1] - 1 ) {
+                               work1[ workIndex ] = 1;
+                           }
+                           else {
+                               work1[workIndex] = m_axisDisplayInfos[j].getFrame();
+                           }
+                       }
+                   }
+
+                   // Allocate memory to hold the world positions corresponding to the
+                   //above pixel positions.
+                   double* work2 = static_cast<double*>( astMalloc( axesCount*nsamp*sizeof( double ) ) );
+                   if( work2 ) {
+                       // Transform the pixel positions into world coordinates.
+                       //astSetI( wcsinfo, "Report", 1 );
+                       astTranN( wcsinfo, nsamp, axesCount, nsamp, work1, 1, axesCount, nsamp, work2 );
+                       //astSetI( wcsinfo, "Report", 0 );
+
+                       // 1-d Mapping from pixel to celestial axis.
+                       lutMaps[k] = astLutMap( nsamp, work2+targetAxis*nsamp, 1.0, 1.0, " " );
+                       //Free work space.
+                       work2 = static_cast<double*>(astFree( work2 ));
+                   }
+                   else {
+                       break;
+                   }
+                   //Free work space.
+                   work1 = static_cast<double*>(astFree( work1 ));
+               }
+               else {
+                  break;
+              }
+           }
+
+           //Make sure both maps were generated.
+           if ( lutMaps[1] != nullptr && lutMaps[0] != nullptr ){
+
+               //Create a parallel map for each axis.
+               AstCmpMap* cmpMap = astCmpMap( lutMaps[1], lutMaps[0], 0, " ");
+
+               //Switch the two display axes since we are permuting.
+               int tmp = axes[0];
+               axes[0] = axes[1];
+               axes[1] = tmp;
+
+                //Create a 2D frameset in pixel coordinates.
+                result = astFrameSet (astPickAxes(
+                        astGetFrame( wcsinfo, AST__BASE ),
+                        2, axes, NULL ), " " );
+
+                //Add in a frameset in world coordinates using the compound map to convert
+                //between them.
+                astAddFrame( result, AST__BASE, cmpMap,
+                        astPickAxes(astGetFrame(wcsinfo, AST__CURRENT), 2, axes, NULL));
+
+                astExport( result );
+           }
+           else {
+               m_errorString= "Could not generate a mapping for display axes.";
+           }
+       }
+    }
+    else {
+        m_errorString = "Axes count, "+QString::number(axesCount)+" must match display axis information size, "
+                +QString::number( displayInfosSize );
+    }
+    astEnd;
+    return result;
+}
+
 AstFrameSet* AstGridPlotter::_make2dFrameCelestialExclude( AstFrameSet* wcsinfo ) {
     AstFrameSet* newFrame = wcsinfo;
     bool actualPerm = Carta::Lib::AxisDisplayInfo::isPermuted( m_axisDisplayInfos );
@@ -293,7 +416,6 @@ AstFrameSet* AstGridPlotter::_make2dFrameCelestialExclude( AstFrameSet* wcsinfo 
     }
     return newFrame;
 }
-*/
 
 bool
 AstGridPlotter::plot()
@@ -307,18 +429,18 @@ AstGridPlotter::plot()
 //        grfGlobals()->pens.push_back( QPen( QColor( "green"), 1));
 //    }
     // setup shadow pen
-    grfGlobals()-> lineShadowPenIndex = -1;//m_shadowPenIndex;
+    grfGlobals()-> lineShadowPenIndex = m_shadowPenIndex;
     // assign VG composer
     grfGlobals()-> vgComposer = m_vgc;
     // pre-cache some things
     grfGlobals()-> prepare();
-
-    // Temporarily override numeric locale, otherwise AST will fail to
-    // parse floating point numbers in the FITS header if the user's
-    // locale uses a comma as a decimal separator. Back up the old
+    
+    // Temporarily override numeric locale, otherwise AST will fail to 
+    // parse floating point numbers in the FITS header if the user's 
+    // locale uses a comma as a decimal separator. Back up the old 
     // locale so that we can switch back afterwards and minimise impact
     // on the rest of the application.
-
+    
     std::string oldLocale = setlocale(LC_NUMERIC, "C");
 
     // get rid of any ast errors from previous calls, just in case
@@ -338,12 +460,6 @@ AstGridPlotter::plot()
     }
     std::string stdstr = m_fitsHeader.toStdString();
     astPutCards( fitschan, stdstr.c_str() );
-    if ( ! astOK ) {
-        qDebug() << "astPutCards() failed";
-        m_errorString = "astPutCards() failed, check logs.";
-        return false;
-    }
-
     if ( m_carLin ) {
         astSet( fitschan, "CarLin=1" );
     }
@@ -354,7 +470,7 @@ AstGridPlotter::plot()
     // try to get WCS out of the fits data
     AstFrameSet * wcsinfo = static_cast < AstFrameSet * > ( astRead( fitschan ) );
     if ( ! astOK ) {
-        m_errorString = "astRead() failed, check logs.";
+        m_errorString = "Some AST LIB error, check logs.";
         return false;
     }
     else if ( wcsinfo == AST__NULL ) {
@@ -366,7 +482,7 @@ AstGridPlotter::plot()
         return false;
     }
 
-    AstFrameSet* newFrame = wcsinfo; //_make2dFrame( wcsinfo );
+    AstFrameSet* newFrame = _make2dFrame( wcsinfo );
     if ( newFrame == nullptr ){
         return false;
     }
@@ -438,104 +554,24 @@ AstGridPlotter::plot()
         astClearStatus;
     }*/
 
-    // TODO: This part of code will move to '_setDisplayLabelOptionforAst()' in AstWcsGridRendeerService.cpp
-    // set Label
-    for(int ii = 0; ii < 2; ii = ii + 1)
-    {
-        QString target = QString("System(%1)").arg(ii+1);
-        const char* CAxisSystem = astGetC( plot, target.toStdString().c_str() );
-        QString SAxisSystem(CAxisSystem);
-        bool isequatorial = 0;
-        if(SAxisSystem == "FK5")
-        {
-            isequatorial = 1;
-            SAxisSystem = ("J2000");
+    if ( false ) {
+        const char * labelling = astGetC( plot, "Labelling" );
+        qDebug() << "labelling= " << labelling << ( ! ! labelling );
+        if( ! labelling) {
+            qDebug() << "Dave1!";
         }
-        else if(SAxisSystem == "FK4")
-        {
-            isequatorial = 1;
-            SAxisSystem = ("B1950");
-        }
-        else if(SAxisSystem == "ICRS")
-        {
-            isequatorial = 1;
-            SAxisSystem = ("ICRS");
-        }
-        else
-        {
-            isequatorial = 0;
-        }
-
-        if(isequatorial)
-        {
-            target = QString("Label(%1)").arg(ii+1);
-            const char* oldLabel = astGetC( plot, target.toStdString().c_str() );
-            QString CapLabel = QString(oldLabel);
-            if(CapLabel == "Right ascension")
-            {
-                CapLabel = "Right Ascension";
-            }
-
-            if(CapLabel == "Ecliptic longitude")
-            {
-                CapLabel = "Ecliptic Longitude";
-            }
-
-            if(CapLabel == "Ecliptic latitude")
-            {
-                CapLabel = "Ecliptic Latitude";
-            }
-
-            QString newLabel = QString("%1=%2 %3").arg(target).arg(SAxisSystem).arg(CapLabel);
-            astSet( plot, newLabel.toStdString().c_str() );
-        }
-        else
-        {
-            target = QString("Label(%1)").arg(ii+1);
-            const char* oldLabel = astGetC( plot, target.toStdString().c_str() );
-            QString CapLabel = QString(oldLabel);
-
-            if(CapLabel == "Galactic longitude")
-            {
-                CapLabel = "Galactic Longitude";
-            }
-
-            if(CapLabel == "Galactic latitude")
-            {
-                CapLabel = "Galactic Latitude";
-            }
-
-            if(CapLabel == "Ecliptic longitude")
-            {
-                CapLabel = "Ecliptic Longitude";
-            }
-
-            if(CapLabel == "Ecliptic latitude")
-            {
-                CapLabel = "Ecliptic Latitude";
-            }
-
-            QString newLabel = QString("%1=%3").arg(target).arg(CapLabel);
-            astSet( plot, newLabel.toStdString().c_str() );
-        }
-
-        if(!isequatorial && SAxisSystem == "Cartesian")
-        {
-            target = QString("Label(%1)").arg(ii+1);
-            const char* oldLabel = astGetC( plot, target.toStdString().c_str() );
-
-            // Capitalization
-            QString CapLabel = QString(oldLabel).toLower();
-            CapLabel.replace(0, 1, QString(oldLabel[0]).toUpper() );
-            QString newLabel = QString("%1=%3").arg(target).arg(CapLabel);
-            astSet( plot, newLabel.toStdString().c_str() );
-        }
-
     }
-
 
     // call the actual plotting
     astGrid( plot );
+
+    if ( false ) {
+        const char * labelling = astGetC( plot, "Labelling" );
+        qDebug() << "labelling== " << labelling << ( ! ! labelling );
+        if( ! labelling) {
+            qDebug() << "Dave2!";
+        }
+    }
 
     if ( ! astOK ) {
         qWarning() << "AST error occurred probably in astGrid()" << astStatus;
@@ -545,13 +581,21 @@ AstGridPlotter::plot()
     plot = (AstPlot *) astAnnul( plot );
     wcsinfo = (AstFrameSet *) astAnnul( wcsinfo );
     fitschan = (AstFitsChan *) astAnnul( fitschan );
-
+    
     // Restore previous numeric locale
-
+    
     setlocale(LC_NUMERIC, oldLocale.c_str());
 
     return true;
 } // plot
+
+
+
+
+void AstGridPlotter::setAxisDisplayInfo( std::vector<Carta::Lib::AxisDisplayInfo>& infos ){
+    m_axisDisplayInfos = infos;
+}
+
 
 bool
 AstGridPlotter::setFitsHeader( const QString & hdr )

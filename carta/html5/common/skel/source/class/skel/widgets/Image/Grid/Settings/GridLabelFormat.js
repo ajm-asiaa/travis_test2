@@ -18,17 +18,13 @@ qx.Class.define("skel.widgets.Image.Grid.Settings.GridLabelFormat", {
         this.base(arguments);
         this.m_side = side;
         this.m_axis = axis;
-        if ( typeof mImport !== "undefined"){
-        	this.m_connector = mImport("connector");
-        }
+        this.m_connector = mImport("connector");
         this._init( );
         
-        if ( this.m_connector !== null ){
-        	var pathDict = skel.widgets.Path.getInstance();
-        	this.m_sharedVarFormats = this.m_connector.getSharedVar(pathDict.LABEL_FORMATS);
-        	this.m_sharedVarFormats.addCB(this._formatsChangedCB.bind(this));
-        	this._formatsChangedCB();
-        }
+        var pathDict = skel.widgets.Path.getInstance();
+        this.m_sharedVarFormats = this.m_connector.getSharedVar(pathDict.LABEL_FORMATS);
+        this.m_sharedVarFormats.addCB(this._formatsChangedCB.bind(this));
+        this._formatsChangedCB();
     },
    
 
@@ -92,7 +88,7 @@ qx.Class.define("skel.widgets.Image.Grid.Settings.GridLabelFormat", {
         _sendFormatCmd : function(){
             var errorMan = skel.widgets.ErrorHandler.getInstance();
             errorMan.clearErrors();
-            if ( this.m_id !== null && this.m_connector !== null ){
+            if ( this.m_id !== null ){
                 var path = skel.widgets.Path.getInstance();
                 var cmd = this.m_id + path.SEP_COMMAND + "setGridLabelFormat";
                 var selectValue = this.m_select.getValue();

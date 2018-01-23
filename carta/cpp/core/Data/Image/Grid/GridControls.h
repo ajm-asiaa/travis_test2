@@ -264,11 +264,8 @@ private:
     void _notifyAxesChanged();
     QStringList _parseColorParams( const QString& params, const QString& label,
             int* red, int* green, int* blue ) const;
-    void _resetCoordinateSystem( const QString coordSystem );
     void _resetState( const Carta::State::StateInterface& otherState );
-    // Deprecated
-    // void _setAxisTypes( std::vector<Carta::Lib::AxisInfo::KnownType> supportedAxes );
-    void _setAxisInfos( std::vector<Carta::Lib::AxisInfo> supportedAxes );
+    void _setAxisTypes( std::vector<Carta::Lib::AxisInfo::KnownType> supportedAxes );
     void _updateGrid();
 
     const static QString ALL;

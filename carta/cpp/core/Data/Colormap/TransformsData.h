@@ -54,8 +54,7 @@ private:
     const static QString DATA_TRANSFORMS;
     const static QString TRANSFORM_NONE;
     const static QString TRANSFORM_ROOT;
-    const static QString TRANSFORM_POLY3;
-    const static QString TRANSFORM_POLY4;
+    const static QString TRANSFORM_POLY;
     const static QString TRANSFORM_SQUARE;
     const static QString TRANSFORM_LOG;
     TransformsData( const QString& path, const QString& id );

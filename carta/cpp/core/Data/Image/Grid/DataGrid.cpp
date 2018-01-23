@@ -187,7 +187,7 @@ QPen DataGrid::_getPen( const QString& key, const Carta::State::StateInterface& 
     int blueAmount = state.getValue<int>( blueLookup );
     QString alphaLookup = Carta::State::UtilState::getLookup( key, Util::ALPHA );
     int alphaAmount = state.getValue<int>( alphaLookup );
-    QString widthLookup = Carta::State::UtilState::getLookup( key, Util::WIDTH );
+    QString widthLookup = Carta::State::UtilState::getLookup( key, Util::PEN_WIDTH );
     int widthAmount = state.getValue<int>( widthLookup );
     QPen pen( QColor(redAmount, greenAmount, blueAmount, alphaAmount));
     pen.setWidth( widthAmount);
@@ -234,7 +234,7 @@ void DataGrid::_initializeDefaultPen( const QString& key, int red, int green, in
     QString alphaLookup = Carta::State::UtilState::getLookup( key, Util::ALPHA );
     m_state.insertValue<int>( alphaLookup, alpha );
     if ( width >= 0 ){
-        QString widthLookup = Carta::State::UtilState::getLookup( key, Util::WIDTH );
+        QString widthLookup = Carta::State::UtilState::getLookup( key, Util::PEN_WIDTH );
         m_state.insertValue<int>( widthLookup, width );
     }
 }
@@ -260,7 +260,7 @@ void DataGrid::_initializeDefaultState(){
     //Spacing goes from 0.250 to 3
 
     m_state.insertValue<bool>( SHOW_AXIS, true );
-    m_state.insertValue<bool>( SHOW_GRID_LINES, false );
+    m_state.insertValue<bool>( SHOW_GRID_LINES, true );
     m_state.insertValue<bool>( SHOW_TICKS, true );
     m_state.insertValue<bool>( SHOW_INTERNAL_LABELS, false );
     m_state.insertValue<bool>( SHOW_COORDS, true );
@@ -341,12 +341,7 @@ bool DataGrid::_isGridVisible() const {
 }
 
 
-// Use to set the displayed coordinate system in UI
-void DataGrid::_resetCoordinateSystem( const QString& coordSystem ){
-    if ( m_state.getValue<QString>( COORD_SYSTEM) != coordSystem ){
-        m_state.setValue<QString>( COORD_SYSTEM, coordSystem );
-    }
-}
+
 
 void DataGrid::_resetGridRenderer(){
     if ( m_wcsGridRenderer.get() != nullptr){
@@ -457,9 +452,10 @@ QString DataGrid::_setAxis( const QString& axisId, const QString& purpose, bool*
     *axisChanged = false;
     QString actualAxis = AxisMapper::getDisplayName( axisId );
     if ( !actualAxis.isEmpty() ){
-        if ( !purpose.isEmpty() ){
+        QString actualPurpose = AxisMapper::getPurpose( purpose );
+        if ( !actualPurpose.isEmpty() ){
             QString oldPurpose = m_state.getValue<QString>( axisId );
-            if ( oldPurpose != purpose ){
+            if ( oldPurpose != actualPurpose ){
 
                 //Get a running total of display axes that are being used; at the same time store
                 //the key of the axis containing the duplicate name, if there is one.
@@ -490,10 +486,6 @@ QString DataGrid::_setAxis( const QString& axisId, const QString& purpose, bool*
                 m_state.setValue<QString>( actualAxis, purpose );
 
                 m_state.flushState();
-
-                // update Label format
-                std::vector<AxisInfo::KnownType> AxisTypeArray = _getDisplayAxes();
-                m_formats->setAxisformat(&AxisTypeArray[0]);
             }
         }
         else {
@@ -539,7 +531,7 @@ QString DataGrid::_setAxesThickness( int thickness, bool* thicknessChanged ){
                 "1]: "+QString::number(thickness);
     }
     else {
-        QString lookup = Carta::State::UtilState::getLookup( AXES, Util::WIDTH );
+        QString lookup = Carta::State::UtilState::getLookup( AXES, Util::PEN_WIDTH );
         int oldThickness = m_state.getValue<int>(lookup);
         if ( oldThickness != thickness ){
             m_state.setValue<int>( lookup, thickness);
@@ -549,64 +541,25 @@ QString DataGrid::_setAxesThickness( int thickness, bool* thicknessChanged ){
     return result;
 }
 
-// bool DataGrid::_setAxisTypes( std::vector<AxisInfo::KnownType> supportedAxes){
-//     int axisCount = supportedAxes.size();
-//     bool axisTypesChanged = false;
-//     int oldCount = m_state.getArraySize( SUPPORTED_AXES );
-//     m_state.resizeArray( SUPPORTED_AXES, axisCount, Carta::State::StateInterface::PreserveAll );
-//     QString coordStr = m_state.getValue<QString>( COORD_SYSTEM );
-//     const Carta::Lib::KnownSkyCS& cs = m_coordSystems->getIndex( coordStr );
-//     for ( int i = 0; i < axisCount; i++ ){
-//         QString name = AxisMapper::getPurpose( supportedAxes[i] );
-//         QString lookup = Carta::State::UtilState::getLookup( SUPPORTED_AXES, i );
-//         QString oldName;
-//         if ( i < oldCount ){
-//             oldName = m_state.getValue<QString>( lookup );
-//         }
-//         if ( name != oldName ){
-//             axisTypesChanged = true;
-//             m_state.setValue<QString>( lookup, name );
-//         }
-//     }
-//     if ( axisTypesChanged ){
-//         m_state.flushState();
-//     }
-//     return axisTypesChanged;
-// }
-
-bool DataGrid::_setAxisInfos( std::vector<AxisInfo> supportedAxes){
+bool DataGrid::_setAxisTypes( std::vector<AxisInfo::KnownType> supportedAxes){
     int axisCount = supportedAxes.size();
     bool axisTypesChanged = false;
     int oldCount = m_state.getArraySize( SUPPORTED_AXES );
     m_state.resizeArray( SUPPORTED_AXES, axisCount, Carta::State::StateInterface::PreserveAll );
-
-    int axisIndex = 0;
-    for( int i=0; i<axisCount; i++ ){
-        QString name = supportedAxes[i].longLabel().plain();
-        QString lookup = Carta::State::UtilState::getLookup( SUPPORTED_AXES, axisIndex );
+    QString coordStr = m_state.getValue<QString>( COORD_SYSTEM );
+    const Carta::Lib::KnownSkyCS& cs = m_coordSystems->getIndex( coordStr );
+    for ( int i = 0; i < axisCount; i++ ){
+        QString name = AxisMapper::getPurpose( supportedAxes[i], cs );
+        QString lookup = Carta::State::UtilState::getLookup( SUPPORTED_AXES, i );
         QString oldName;
         if ( i < oldCount ){
             oldName = m_state.getValue<QString>( lookup );
         }
         if ( name != oldName ){
-            //_setAxis( AxisMapper::AXIS_X, supportedAxes[0].longLabel().plain(), &axisTypesChanged);
-            //_setAxis( AxisMapper::AXIS_Y, supportedAxes[1].longLabel().plain(), &axisTypesChanged);
-            //if(i==0){
-            //    _setAxis( AxisMapper::AXIS_X, name, &axisTypesChanged);
-            //}
-            //else if(i==1){
-            //    _setAxis( AxisMapper::AXIS_Y, name, &axisTypesChanged);
-            //}
             axisTypesChanged = true;
-            if ( AxisMapper::getType(name)==Carta::Lib::AxisInfo::KnownType::STOKES ){
-                m_state.resizeArray( SUPPORTED_AXES, axisCount-1, Carta::State::StateInterface::PreserveAll);
-                continue;
-            }
             m_state.setValue<QString>( lookup, name );
         }
-        axisIndex++;
     }
-
     if ( axisTypesChanged ){
         m_state.flushState();
     }
@@ -741,7 +694,7 @@ QString DataGrid::_setGridThickness( int thickness, bool* coordChanged ){
                 QString::number(thickness);
     }
     else {
-        QString lookup = Carta::State::UtilState::getLookup( GRID, Util::WIDTH );
+        QString lookup = Carta::State::UtilState::getLookup( GRID, Util::PEN_WIDTH );
         int oldThickness = m_state.getValue<int>(lookup);
         if ( oldThickness != thickness ){
             m_state.setValue<int>( lookup, thickness);
@@ -927,7 +880,7 @@ QString DataGrid::_setTickThickness( int tickThickness, bool* thicknessChanged )
                 "]: "+QString::number(tickThickness);
     }
     else {
-        QString lookup = Carta::State::UtilState::getLookup( TICK, Util::WIDTH );
+        QString lookup = Carta::State::UtilState::getLookup( TICK, Util::PEN_WIDTH );
         int oldThickness = m_state.getValue<int>(lookup);
         if ( oldThickness != tickThickness ){
             m_state.setValue<int>( lookup, tickThickness);

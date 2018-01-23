@@ -46,7 +46,7 @@ GridControls::GridControls( const QString& path, const QString& id):
 
 
 void GridControls::_initializeDefaultState(){
-    m_state.insertValue<bool>( ALL, false  );
+    m_state.insertValue<bool>( ALL, true  );
     m_state.insertObject( DataGrid::GRID, m_dataGrid->_getState().toString());
     m_state.flushState();
 }
@@ -523,14 +523,6 @@ QStringList GridControls::_parseColorParams( const QString& params, const QStrin
     return result;
 }
 
-void GridControls::_resetCoordinateSystem( const QString coordSystem ){
-    m_dataGrid->_resetCoordinateSystem( coordSystem );
-    Carta::State::StateInterface gridState = m_dataGrid->_getState();
-    QString gridStateStr = gridState.toString();
-    m_state.setObject( DataGrid::GRID, gridStateStr );
-    m_state.flushState();
-}
-
 void GridControls::_resetState( const Carta::State::StateInterface& otherState ){
     m_dataGrid->_resetState( otherState );
     QString gridStateStr = m_dataGrid->_getState().toString();
@@ -548,19 +540,11 @@ void GridControls::setApplyAll( bool applyAll ){
     }
 }
 
-// void GridControls::_setAxisTypes( std::vector<AxisInfo::KnownType> supportedAxes ){
-//     bool axisTypesChanged = m_dataGrid->_setAxisTypes( supportedAxes );
-//     if ( axisTypesChanged ){
-//         _updateGrid();
-//     }
-// }
-
-void GridControls::_setAxisInfos( std::vector<AxisInfo> supportedAxes ){
-    bool axisInfosChanged = m_dataGrid->_setAxisInfos( supportedAxes );
-    if ( axisInfosChanged ){
+void GridControls::_setAxisTypes( std::vector<AxisInfo::KnownType> supportedAxes ){
+    bool axisTypesChanged = m_dataGrid->_setAxisTypes( supportedAxes );
+    if ( axisTypesChanged ){
         _updateGrid();
     }
-    _notifyAxesChanged();
 }
 
 QStringList GridControls::setAxesColor( int redAmount, int greenAmount, int blueAmount ){

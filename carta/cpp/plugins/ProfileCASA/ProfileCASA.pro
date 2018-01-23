@@ -21,7 +21,7 @@ casacoreLIBS += -lcasa_images -lcasa_coordinates -lcasa_fits -lcasa_measures
 LIBS += $${casacoreLIBS}
 LIBS += -L$${WCSLIBDIR}/lib -lwcs
 LIBS += -L$${CFITSIODIR}/lib -lcfitsio
-LIBS += -L$${IMAGEANALYSISDIR}/lib -limageanalysis -lcomponents
+LIBS += -L$${IMAGEANALYSISDIR}/lib -limageanalysis
 LIBS += -L$$OUT_PWD/../../core/ -lcore
 LIBS += -L$$OUT_PWD/../../CartaLib/ -lCartaLib
 
@@ -50,10 +50,4 @@ else{
     PRE_TARGETDEPS += $$OUT_PWD/../../core/libcore.so
 }
 
-unix:!macx {
-  QMAKE_RPATHDIR=$$OUT_PWD/../../../../../CARTAvis-externals/ThirdParty/casa/trunk/linux/lib
-  QMAKE_RPATHDIR+=$${WCSLIBDIR}/lib
-}
-else {
 
-}

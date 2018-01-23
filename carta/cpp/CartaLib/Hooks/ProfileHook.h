@@ -7,6 +7,7 @@
 #include "ProfileResult.h"
 #include "CartaLib/CartaLib.h"
 #include "CartaLib/IPlugin.h"
+#include "CartaLib/RegionInfo.h"
 #include "CartaLib/ProfileInfo.h"
 #include "CartaLib/Hooks/ProfileResult.h"
 
@@ -16,9 +17,6 @@ namespace Lib
 {
 namespace Image {
 class ImageInterface;
-}
-namespace Regions {
-class RegionBase;
 }
 namespace Hooks
 {
@@ -39,7 +37,7 @@ public:
      struct Params {
 
             Params( std::shared_ptr<Image::ImageInterface> dataSource,
-                    std::shared_ptr<Carta::Lib::Regions::RegionBase> regionInfo,
+                    Carta::Lib::RegionInfo regionInfo,
                     Carta::Lib::ProfileInfo profileInfo ){
                 m_dataSource = dataSource;
                 m_regionInfo = regionInfo;
@@ -47,7 +45,7 @@ public:
             }
 
             std::shared_ptr<Image::ImageInterface> m_dataSource;
-            std::shared_ptr<Carta::Lib::Regions::RegionBase> m_regionInfo;
+            Carta::Lib::RegionInfo m_regionInfo;
             Carta::Lib::ProfileInfo m_profileInfo;
         };
 

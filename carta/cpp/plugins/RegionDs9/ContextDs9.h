@@ -9,9 +9,7 @@
 
 namespace Carta {
     namespace Lib {
-        namespace Regions {
-            class RegionBase;
-        }
+        class RegionInfo;
     }
 }
 
@@ -40,18 +38,18 @@ enum SkyFrame {FK4, FK4_NO_E, FK5, ICRS, GALACTIC, SUPERGALACTIC,
 enum SkyDist {DEGREE, ARCMIN, ARCSEC};
 enum PointShape {CIRCLE,BOX,DIAMOND,CROSS,XPT,ARROW,BOXCIRCLE};
 
-inline casacore::MDirection::Types todirection( SkyFrame frame ) {
+inline casa::MDirection::Types todirection( SkyFrame frame ) {
     switch ( frame ) {
     case FK4:
-        return casacore::MDirection::B1950;
+        return casa::MDirection::B1950;
     case FK5:
-        return casacore::MDirection::J2000;
+        return casa::MDirection::J2000;
     case GALACTIC:
-        return casacore::MDirection::GALACTIC;
+        return casa::MDirection::GALACTIC;
     case ECLIPTIC:
-        return casacore::MDirection::ECLIPTIC;
+        return casa::MDirection::ECLIPTIC;
     default:
-        return casacore::MDirection::GALACTIC;
+        return casa::MDirection::GALACTIC;
     }
 }
 
@@ -106,7 +104,7 @@ public:
      * Returns a list of regions that were read by the parser.
      * @return - a list of regions returned by the parser.
      */
-    std::vector<Carta::Lib::Regions::RegionBase* > getRegions() const;
+    std::vector<std::shared_ptr<Carta::Lib::RegionInfo> > getRegions() const;
 
     //-----------------------------------------------------------------------------------------
     //               Internal methods called by the parser.
@@ -277,6 +275,6 @@ public:
 
     virtual ~ContextDs9();
 private:
-    std::vector<Carta::Lib::Regions::RegionBase*> m_regions;
+    std::vector<std::shared_ptr<Carta::Lib::RegionInfo> > m_regions;
 };
 

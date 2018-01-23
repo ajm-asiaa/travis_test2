@@ -9,11 +9,8 @@
 #include "Data/Image/Grid/Fonts.h"
 #include "Data/Image/Grid/LabelFormats.h"
 #include "Data/Image/Contour/ContourGenerateModes.h"
-#include "Data/Image/Contour/ContourTypes.h"
 #include "Data/Image/Contour/ContourSpacingModes.h"
 #include "Data/Image/Contour/ContourStyles.h"
-#include "Data/Image/ImageContext.h"
-#include "Data/Image/ImageZoom.h"
 #include "Data/Image/LayerCompositionModes.h"
 #include "Data/Histogram/ChannelUnits.h"
 #include "Data/DataLoader.h"
@@ -33,7 +30,6 @@
 #include "Data/Profile/Profiler.h"
 #include "Data/Profile/ProfileStatistics.h"
 #include "Data/Profile/GenerateModes.h"
-#include "Data/Region/RegionTypes.h"
 #include "Data/Snapshot/Snapshots.h"
 #include "Data/Statistics/Statistics.h"
 #include "Data/ViewPlugins.h"
@@ -43,9 +39,10 @@
 #include "Data/Units/UnitsWavelength.h"
 #include "Data/Util.h"
 #include "State/UtilState.h"
+
+#include <QDir>
 #include <QTime>
 #include <QDebug>
-#include <QElapsedTimer>
 
 namespace Carta {
 
@@ -55,7 +52,7 @@ class ViewManager::Factory : public Carta::State::CartaObjectFactory {
 
 public:
     Factory():
-        CartaObjectFactory( "ViewManager" ){}
+        CartaObjectFactory( "ViewManager" ){};
     Carta::State::CartaObject * create (const QString & path, const QString & id)
     {
         return new ViewManager (path, id);
@@ -81,6 +78,8 @@ ViewManager::ViewManager( const QString& path, const QString& id)
       m_pluginsLoaded( nullptr ),
       m_snapshots( nullptr ){
 
+    Carta::State::ObjectManager* objMan = Carta::State::ObjectManager::objectManager();
+    objMan->printObjects();
     Util::findSingletonObject<Clips>();
     Util::findSingletonObject<Colormaps>();
     Util::findSingletonObject<TransformsData>();
@@ -96,14 +95,12 @@ ViewManager::ViewManager( const QString& path, const QString& id)
     Util::findSingletonObject<CoordinateSystems>();
     Util::findSingletonObject<Themes>();
     Util::findSingletonObject<ContourGenerateModes>();
-    Util::findSingletonObject<ContourTypes>();
     Util::findSingletonObject<ContourSpacingModes>();
     Util::findSingletonObject<ContourStyles>();
     Util::findSingletonObject<LayerCompositionModes>();
     Util::findSingletonObject<PlotStyles>();
     Util::findSingletonObject<LineStyles>();
     Util::findSingletonObject<ProfileStatistics>();
-    Util::findSingletonObject<RegionTypes>();
     Util::findSingletonObject<GenerateModes>();
     Util::findSingletonObject<UnitsFrequency>();
     Util::findSingletonObject<UnitsIntensity>();
@@ -115,9 +112,6 @@ ViewManager::ViewManager( const QString& path, const QString& id)
 
     QTime time = QTime::currentTime();
     qsrand((uint)time.msec());
-
-    //Carta::State::ObjectManager* objMan = Carta::State::ObjectManager::objectManager();
-    //objMan->printObjects();
 }
 
 
@@ -142,13 +136,11 @@ void ViewManager::_adjustSize( int count, const QString& name, const QVector<int
 }
 
 void ViewManager::_clear(){
-   _clearHistograms( 0, m_histograms.size() );
+    _clearHistograms( 0, m_controllers.size() );
     _clearAnimators( 0, m_animators.size() );
     _clearColormaps( 0, m_colormaps.size() );
     _clearStatistics( 0, m_statistics.size() );
-   _clearImageZooms( 0, m_imageZooms.size() );
-   _clearImageContexts( 0, m_imageContexts.size() );
-   _clearProfilers( 0, m_profilers.size() );
+    _clearProfilers( 0, m_profilers.size() );
     _clearControllers( 0, m_controllers.size() );
     if ( m_layout != nullptr ){
         m_layout->clear();
@@ -171,13 +163,7 @@ void ViewManager::_clearControllers( int startIndex, int upperBound ){
             stat->removeLink( m_controllers[i]);
         }
         for ( Profiler* prof : m_profilers ){
-            prof->removeLink( m_controllers[i]);
-        }
-        for ( ImageZoom* zoom : m_imageZooms ){
-            zoom->removeLink( m_controllers[i]);
-        }
-        for ( ImageContext* context : m_imageContexts ){
-            context->removeLink( m_controllers[i] );
+            prof->removeLink( m_profilers[i]);
         }
         objMan->destroyObject( m_controllers[i]->getId() );
         m_controllers.removeAt(i);
@@ -208,22 +194,6 @@ void ViewManager::_clearHistograms( int startIndex, int upperBound ){
         }
         objMan->destroyObject( m_histograms[i]->getId() );
         m_histograms.removeAt(i);
-    }
-}
-
-void ViewManager::_clearImageZooms( int startIndex, int upperBound ){
-    Carta::State::ObjectManager* objMan = Carta::State::ObjectManager::objectManager();
-    for ( int i = upperBound-1; i >= startIndex; i-- ){
-        objMan->destroyObject( m_imageZooms[i]->getId() );
-        m_imageZooms.removeAt( i );
-    }
-}
-
-void ViewManager::_clearImageContexts( int startIndex, int upperBound ){
-    Carta::State::ObjectManager* objMan = Carta::State::ObjectManager::objectManager();
-    for ( int i = upperBound-1; i >= startIndex; i-- ){
-        objMan->destroyObject( m_imageContexts[i]->getId() );
-        m_imageContexts.removeAt( i );
     }
 }
 
@@ -305,28 +275,6 @@ QString ViewManager::getObjectId( const QString& plugin, int index, bool forceCr
             viewId = _makeHistogram(index);
         }
     }
-    else if ( plugin == ImageZoom::CLASS_NAME ){
-        if ( 0 <= index && index < m_imageZooms.size() && !forceCreate){
-            viewId = m_imageZooms[index]->getPath();
-        }
-        else {
-            if ( index == -1 ){
-                index = m_imageZooms.size();
-            }
-            viewId = _makeImageZoom(index);
-        }
-    }
-    else if ( plugin == ImageContext::CLASS_NAME ){
-        if ( 0 <= index && index < m_imageContexts.size() && !forceCreate){
-            viewId = m_imageContexts[index]->getPath();
-        }
-        else {
-            if ( index == -1 ){
-                index = m_imageContexts.size();
-            }
-            viewId = _makeImageContext(index);
-        }
-    }
     else if ( plugin == Snapshots::CLASS_NAME ){
         viewId = _makeSnapshots();
     }
@@ -384,16 +332,6 @@ int ViewManager::getHistogramCount() const {
     return histogramCount;
 }
 
-int ViewManager::getImageContextCount() const {
-    int contextCount = m_imageContexts.size();
-    return contextCount;
-}
-
-int ViewManager::getImageZoomCount() const {
-    int zoomCount = m_imageZooms.size();
-    return zoomCount;
-}
-
 
 void ViewManager::_initCallbacks(){
     addCommandCallback( "clearLayout", [=] (const QString & /*cmd*/,
@@ -415,27 +353,13 @@ void ViewManager::_initCallbacks(){
                     const QString & /*params*/, const QString & /*sessionId*/) -> QString {
             setAnalysisView();
             return "";
-    });
-
-    addCommandCallback( "setDefaultLayout", [=] (const QString & /*cmd*/,
-                    const QString & /*params*/, const QString & /*sessionId*/) -> QString {
-            setDefaultLayoutViewWithCurrentPluginList();
-            return "";
-    });
-
-    addCommandCallback( "setHistogramAnalysisLayout", [=] (const QString & /*cmd*/,
-                    const QString & /*params*/, const QString & /*sessionId*/) -> QString {
-            setHistogramAnalysisView();
-            return "";
-    });
+        });
 
     addCommandCallback( "setImageLayout", [=] (const QString & /*cmd*/,
                         const QString & /*params*/, const QString & /*sessionId*/) -> QString {
-
-            // Will rename command later
-            setImageCompositeView();
+            setImageView();
             return "";
-    });
+        });
 
     //Callback for adding a data source to a Controller.
     addCommandCallback( "dataLoaded", [=] (const QString & /*cmd*/,
@@ -444,27 +368,7 @@ void ViewManager::_initCallbacks(){
         std::set<QString> keys = {Util::ID,DATA};
         std::map<QString,QString> dataValues = Carta::State::UtilState::parseParamMap( params, keys );
         bool fileLoaded = false;
-
-        // get the loading file name
-        QString fileName = dataValues[DATA].split("/").last();
-
-        // get the timer for the function "loadFile(...)"
-        QElapsedTimer timer;
-        timer.start();
-
-        if (CARTA_RUNTIME_CHECKS) {
-            qCritical() << "<> Start loading" << fileName << "!";
-        }
-
-        // execute the function "loadFile(...)"
         QString result = loadFile( dataValues[Util::ID], dataValues[DATA],&fileLoaded);
-
-        // set the output stype of log lines
-        int elapsedTime = timer.elapsed();
-        if (CARTA_RUNTIME_CHECKS) {
-            qCritical() << "<> Total loading time for" << fileName << ":" << elapsedTime << "ms";
-        }
-
         if ( !fileLoaded ){
             Util::commandPostProcess( result);
         }
@@ -510,6 +414,14 @@ void ViewManager::_initCallbacks(){
         return result;
     });
 
+
+    //Callback for updating links after all objects have been created.
+    addCommandCallback( "refreshState", [=] (const QString & /*cmd*/,
+                    const QString & /*params*/, const QString & /*sessionId*/) -> QString {
+                _refreshState();
+                return "";
+            });
+
     addCommandCallback( "setPlugin", [=] (const QString & /*cmd*/,
                             const QString & params, const QString & /*sessionId*/) -> QString {
             std::set<QString> keys = { DEST_PLUGIN, SOURCE_LOCATION_ID };
@@ -540,12 +452,7 @@ void ViewManager::_initCallbacks(){
 
 
 void ViewManager::_initializeDefaultState(){
-//    ssetDefaultLayoutView();
-    setDefaultLayoutViewNoOldPluginList();
-
-    // setAnalysisView();
-    // setHistogramAnalysisView();
-    // setImageView();
+    setAnalysisView();
     //Load the default snapshot if one exists.
     _makeSnapshots();
     m_snapshots->initializeDefaultState();
@@ -573,7 +480,6 @@ QString ViewManager::_isDuplicateLink( const QString& sourceName, const QString&
             }
         }
     }
-
     if ( alreadyLinked ){
         result = "Destination can only be linked to one "+sourceName;
     }
@@ -681,22 +587,6 @@ void ViewManager::_moveView( const QString& plugin, int oldIndex, int newIndex )
                 m_histograms.insert( newIndex, histogram );
             }
         }
-        else if ( plugin == ImageZoom::CLASS_NAME ){
-            int zoomCount = m_imageZooms.size();
-            if ( oldIndex < zoomCount && newIndex < zoomCount ){
-                ImageZoom* imageZoom = m_imageZooms[oldIndex];
-                m_imageZooms.removeAt(oldIndex );
-                m_imageZooms.insert( newIndex, imageZoom );
-            }
-        }
-        else if ( plugin == ImageContext::CLASS_NAME ){
-            int contextCount = m_imageContexts.size();
-            if ( oldIndex < contextCount && newIndex < contextCount ){
-                ImageContext* context = m_imageContexts[oldIndex];
-                m_imageContexts.removeAt(oldIndex );
-                m_imageContexts.insert( newIndex, context );
-            }
-        }
         else if ( plugin == Profiler::CLASS_NAME ){
            int profileCount = m_profilers.size();
            if ( oldIndex < profileCount && newIndex < profileCount ){
@@ -770,36 +660,7 @@ QString ViewManager::_makeHistogram( int index ){
     for ( int i = index; i < currentCount + 1; i++ ){
         m_histograms[i]->setIndex( i );
     }
-    //If there is only one controller, automatically link it to the
-    //histogram.
-    if ( m_controllers.size() == 1 ){
-        m_histograms[index]->addLink( m_controllers[0] );
-    }
     return m_histograms[index]->getPath();
-}
-
-QString ViewManager::_makeImageZoom( int index ){
-    int currentCount = m_imageZooms.size();
-    CARTA_ASSERT( 0 <= index && index <= currentCount );
-    Carta::State::ObjectManager* objMan = Carta::State::ObjectManager::objectManager();
-    ImageZoom* zoomObj = objMan->createObject<ImageZoom>();
-    m_imageZooms.insert( index, zoomObj );
-    for ( int i = index; i < currentCount + 1; i++ ){
-        m_imageZooms[i]->setIndex( i );
-    }
-    return m_imageZooms[index]->getPath();
-}
-
-QString ViewManager::_makeImageContext( int index ){
-    int currentCount = m_imageContexts.size();
-    CARTA_ASSERT( 0 <= index && index <= currentCount );
-    Carta::State::ObjectManager* objMan = Carta::State::ObjectManager::objectManager();
-    ImageContext* contextObj = objMan->createObject<ImageContext>();
-    m_imageContexts.insert( index, contextObj );
-    for ( int i = index; i < currentCount + 1; i++ ){
-        m_imageContexts[i]->setIndex( i );
-    }
-    return m_imageContexts[index]->getPath();
 }
 
 QString ViewManager::_makeLayout(){
@@ -846,7 +707,6 @@ QString ViewManager::_makeProfile( int index ){
     //and a single controller display, assume the user wants them linked.
     if ( m_profilers.size() == 1 && m_controllers.size() == 1 ){
         m_profilers[0]->addLink( m_controllers[0] );
-
     }
     return m_profilers[index]->getPath();
 }
@@ -990,9 +850,6 @@ void ViewManager::_refreshState(){
     for ( Colormap* map : m_colormaps ){
         map->refreshState();
     }
-    for ( Profiler* prof : m_profilers){
-    	prof->refreshState();
-    }
 
 }
 
@@ -1023,14 +880,6 @@ void ViewManager::_removeView( const QString& plugin, int index ){
             QString sourceId = hist->getPath();
             linkRemove( sourceId, destId );
         }
-        for ( ImageZoom* zoom : m_imageZooms ){
-            QString sourceId = zoom->getPath();
-            linkRemove( sourceId, destId );
-        }
-        for ( ImageContext* context : m_imageContexts ){
-            QString sourceId = context->getPath();
-            linkRemove( sourceId, destId );
-        }
         for ( Profiler* profile : m_profilers ){
             QString sourceId = profile->getPath();
             linkRemove( sourceId, destId );
@@ -1049,14 +898,6 @@ void ViewManager::_removeView( const QString& plugin, int index ){
     else if ( plugin == Histogram::CLASS_NAME ){
         objMan->destroyObject( m_histograms[index]->getId());
         m_histograms.removeAt( index );
-    }
-    else if ( plugin == ImageContext::CLASS_NAME ){
-        objMan->destroyObject( m_imageContexts[index]->getId());
-        m_imageContexts.removeAt( index );
-    }
-    else if ( plugin == ImageZoom::CLASS_NAME ){
-        objMan->destroyObject( m_imageZooms[index]->getId());
-        m_imageZooms.removeAt( index );
     }
     else if ( plugin == Profiler::CLASS_NAME ){
         objMan->destroyObject( m_profilers[index]->getId());
@@ -1084,20 +925,6 @@ int ViewManager::_removeViews( const QString& name, int startIndex, int endIndex
             upperBound = existingCount;
         }
         _clearHistograms(startIndex, upperBound);
-    }
-    else if ( name == ImageZoom::CLASS_NAME ){
-        existingCount = m_imageZooms.size();
-        if ( endIndex < 0 ){
-            upperBound = existingCount;
-        }
-        _clearImageZooms(startIndex, upperBound);
-    }
-    else if ( name == ImageContext::CLASS_NAME ){
-        existingCount = m_imageContexts.size();
-        if ( endIndex < 0 ){
-            upperBound = existingCount;
-        }
-        _clearImageContexts(startIndex, upperBound);
     }
     else if ( name == Animator::CLASS_NAME ){
         existingCount = m_animators.size();
@@ -1131,81 +958,19 @@ int ViewManager::_removeViews( const QString& name, int startIndex, int endIndex
     return existingCount;
 }
 
-
-void ViewManager::setDefaultLayoutView(bool cleanPluginList) {
-
-    if ( m_layout == nullptr ){
-        _makeLayout();
-    }
-    if ( !m_layout->isLayoutDefault()){
-        _clearHistograms( 0, m_histograms.size() );
-        _clearAnimators( 1, m_animators.size() );
-        _clearColormaps( 1, m_colormaps.size() );
-        _clearStatistics( 1, m_statistics.size());
-        _clearProfilers( 0, m_profilers.size() );
-        _clearControllers( 1, m_controllers.size() );
-
-        m_layout->setLayoutDefault(cleanPluginList);
-
-        //Add the links to establish reasonable defaults.
-        m_animators[0]->addLink( m_controllers[0]);
-        m_colormaps[0]->addLink( m_controllers[0]);
-        m_statistics[0]->addLink( m_controllers[0]);
-
-        // m_histograms[0]->addLink( m_controllers[0]);
-        // m_colormaps[0]->addLink( m_histograms[0]);
-        _refreshState();
-    }
-
-}
-
-
-void ViewManager::setDefaultLayoutViewWithCurrentPluginList(){
-
-    setDefaultLayoutView(true);
-}
-
-void ViewManager::setDefaultLayoutViewNoOldPluginList(){
-
-    setDefaultLayoutView(false);
-}
-
 void ViewManager::setAnalysisView(){
     if ( m_layout == nullptr ){
         _makeLayout();
     }
     if ( !m_layout->isLayoutAnalysis()){
-        _clearHistograms( 0, m_histograms.size() );
+        _clearHistograms( 1, m_histograms.size() );
         _clearAnimators( 1, m_animators.size() );
         _clearColormaps( 1, m_colormaps.size() );
         _clearStatistics( 0, m_statistics.size());
-        _clearProfilers( 1, m_profilers.size() );
-        _clearControllers( 1, m_controllers.size() );
-
-        m_layout->setLayoutAnalysis();
-
-        //Add the links to establish reasonable defaults.
-        m_animators[0]->addLink( m_controllers[0]);
-        m_colormaps[0]->addLink( m_controllers[0]);
-        m_profilers[0]->addLink( m_controllers[0]);
-        _refreshState();
-    }
-}
-
-// before 20170307, this was the layout of original AnalysisView
-void ViewManager::setHistogramAnalysisView(){
-    if ( m_layout == nullptr ){
-        _makeLayout();
-    }
-    if ( !m_layout->isLayoutHistogramAnalysis()){
-        _clearHistograms( 0, m_histograms.size() );
-        _clearAnimators( 1, m_animators.size() );
-        _clearColormaps( 1, m_colormaps.size() );
-        _clearStatistics( 1, m_statistics.size());
         _clearProfilers( 0, m_profilers.size() );
         _clearControllers( 1, m_controllers.size() );
 
-        m_layout->setLayoutHistogramAnalysis();
+        m_layout->setLayoutAnalysis();
 
         //Add the links to establish reasonable defaults.
         m_animators[0]->addLink( m_controllers[0]);
@@ -1216,29 +981,27 @@ void ViewManager::setHistogramAnalysisView(){
     }
 }
 
-void ViewManager::setImageCompositeView(){
+void ViewManager::setDeveloperView(){
     if ( m_layout == nullptr ){
         _makeLayout();
     }
-    if ( !m_layout->isLayoutImageComposite() ){
-        _clearHistograms( 0, m_histograms.size() );
-        _clearAnimators( 1, m_animators.size() );
-        _clearColormaps( 1, m_colormaps.size() );
-        _clearStatistics( 0, m_statistics.size());
-        _clearProfilers( 0, m_profilers.size());
-        _clearControllers( 1, m_controllers.size() );
 
-        _clearImageZooms( 1, m_imageZooms.size());
-        _clearImageContexts( 1, m_imageContexts.size());
+    _clearHistograms( 1, m_histograms.size() );
+    _clearAnimators( 1, m_animators.size() );
+    _clearColormaps( 0, m_colormaps.size() );
+    _clearStatistics( 1, m_statistics.size());
+    _clearProfilers( 1, m_profilers.size() );
+    _clearControllers( 1, m_controllers.size() );
 
-        m_layout->setLayoutImageComposite();
-
-        m_animators[0]->addLink( m_controllers[0]);
-        m_colormaps[0]->addLink( m_controllers[0]);
-
-        m_imageZooms[0]->addLink( m_controllers[0]);
-        m_imageContexts[0]->addLink( m_controllers[0]);
-    }
+    m_layout->setLayoutDeveloper();
+    //Add the links to establish reasonable defaults.
+    m_animators[0]->addLink( m_controllers[0]);
+    m_histograms[0]->addLink( m_controllers[0]);
+    //m_statistics[0]->addLink( m_controllers[0]);
+    //m_colormaps[0]->addLink( m_controllers[0]);
+    m_profilers[0]->addLink( m_controllers[0]);
+    //m_colormaps[0]->addLink( m_histograms[0]);
+    _refreshState();
 }
 
 void ViewManager::setImageView(){
@@ -1257,42 +1020,11 @@ void ViewManager::setImageView(){
     }
 }
 
-void ViewManager::setDeveloperView(){
-    if ( m_layout == nullptr ){
-        _makeLayout();
-    }
-
-    _clearHistograms( 0, m_histograms.size() );
-    _clearAnimators( 1, m_animators.size() );
-    _clearColormaps( 1, m_colormaps.size() );
-    _clearStatistics( 0, m_statistics.size());
-    _clearProfilers( 1, m_profilers.size() );
-    _clearControllers( 1, m_controllers.size() );
-
-    _clearImageZooms( 0, m_imageZooms.size());
-    _clearImageContexts( 0, m_imageContexts.size());
-
-    m_layout->setLayoutDeveloper();
-    //Add the links to establish reasonable defaults.
-    m_animators[0]->addLink( m_controllers[0]);
-    //m_imageZooms[0]->addLink( m_controllers[0]);
-    //m_imageContexts[0]->addLink( m_controllers[0]);
-    //m_histograms[0]->addLink( m_controllers[0]);
-    //m_statistics[0]->addLink( m_controllers[0]);
-
-    m_colormaps[0]->addLink( m_controllers[0]);
-    m_profilers[0]->addLink( m_controllers[0]);
-    //m_colormaps[0]->addLink( m_histograms[0]);
-    _refreshState();
-}
-
 QString ViewManager::_setPlugin( const QString& sourceNodeId, const QString& destPluginType ){
     QString msg;
     if ( destPluginType != Controller::PLUGIN_NAME && destPluginType != Animator::CLASS_NAME &&
             destPluginType != Colormap::CLASS_NAME &&
             destPluginType != Histogram::CLASS_NAME &&
-            destPluginType != ImageZoom::CLASS_NAME &&
-            destPluginType != ImageContext::CLASS_NAME &&
             destPluginType != Profiler::CLASS_NAME &&
             destPluginType != Statistics::CLASS_NAME &&
             destPluginType != ViewPlugins::CLASS_NAME &&
@@ -1328,6 +1060,7 @@ QString ViewManager::_setPlugin( const QString& sourceNodeId, const QString& des
                 }
             }
         }
+
     }
     return msg;
 }
@@ -1360,8 +1093,6 @@ ViewManager::~ViewManager(){
     _clearAnimators( 0, m_animators.size() );
     _clearColormaps( 0, m_colormaps.size() );
     _clearHistograms( 0, m_histograms.size() );
-    _clearImageZooms( 0, m_imageZooms.size() );
-    _clearImageContexts( 0, m_imageContexts.size());
     _clearStatistics( 0, m_statistics.size() );
     _clearProfilers( 0, m_profilers.size() );
     _clearControllers( 0, m_controllers.size() );
@@ -1395,8 +1126,6 @@ ViewManager::~ViewManager(){
     delete obj;
     obj =  Util::findSingletonObject<ContourGenerateModes>();
     delete obj;
-    obj =  Util::findSingletonObject<ContourTypes>();
-    delete obj;
     obj =  Util::findSingletonObject<ContourSpacingModes>();
     delete obj;
     obj =  Util::findSingletonObject<ContourStyles>();
@@ -1410,8 +1139,6 @@ ViewManager::~ViewManager(){
     obj =  Util::findSingletonObject<ProfileStatistics>();
     delete obj;
     obj =  Util::findSingletonObject<GenerateModes>();
-    delete obj;
-    obj = Util::findSingletonObject<RegionTypes>();
     delete obj;
     obj =  Util::findSingletonObject<UnitsFrequency>();
     delete obj;
@@ -1429,3 +1156,4 @@ ViewManager::~ViewManager(){
 }
 }
 }
+

@@ -17,7 +17,6 @@ namespace VGE = VG::Entries;
 
 namespace WcsPlotterPluginNS
 {
-inline AstWcsGridRenderService::Element operator++( AstWcsGridRenderService::Element& x ) { return x = (AstWcsGridRenderService::Element)(((int)(x) + 1)); }
 
 
 struct AstWcsGridRenderService::Pimpl
@@ -68,44 +67,27 @@ AstWcsGridRenderService::AstWcsGridRenderService()
 AstWcsGridRenderService::~AstWcsGridRenderService()
 { }
 
-QString AstWcsGridRenderService::_getFitsHeaderforAst(QStringList &fitsHeader)
-{
-    QStringList AstFitsHeader = fitsHeader;
-
-#if CARTA_RUNTIME_CHECKS > 0
-    for(int ii = 0; ii < AstFitsHeader.length(); ii = ii + 1)
-    {
-        std::cout << AstFitsHeader[ii] << "\n";
-    }
-#endif
-
-    return AstFitsHeader.join( "" );
-}
-
 void
 AstWcsGridRenderService::setInputImage( Carta::Lib::Image::ImageInterface::SharedPtr image )
 {
     CARTA_ASSERT( image );
-    if ( !m_iimage || m_iimage.get() != image.get() ){
-        m_iimage = image;
 
-        // get the fits header from this image
-        FitsHeaderExtractor fhExtractor;
-        fhExtractor.setInput( m_iimage );
-        QStringList header = fhExtractor.getHeader();
+    m_iimage = image;
 
-        // sanity check
-        if ( header.size() < 1 ) {
-            qWarning() << "Could not extract fits header..."
-                       << fhExtractor.getErrors();
-        }
+    // get the fits header from this image
+    FitsHeaderExtractor fhExtractor;
+    fhExtractor.setInput( m_iimage );
+    QStringList header = fhExtractor.getHeader();
 
-        if ( header != m().fitsHeader ) {
-            m_vgValid = false;
-            auto len = header.length();
-            std::sort(&header[0],&header[len-2]);
-            m().fitsHeader = header;
-        }
+    // sanity check
+    if ( header.size() < 1 ) {
+        qWarning() << "Could not extract fits header..."
+                   << fhExtractor.getErrors();
+    }
+
+    if ( header != m().fitsHeader ) {
+        m_vgValid = false;
+        m().fitsHeader = header;
     }
 } // setInputImage
 
@@ -216,8 +198,24 @@ AstWcsGridRenderService::renderNow()
         m_vgc.append < VGE::Restore > ();
     }
 
+    auto elements {
+        Element::BorderLines,
+        Element::AxisLines1,
+        Element::AxisLines2,
+        Element::GridLines1,
+        Element::GridLines2,
+        Element::TickLines1,
+        Element::TickLines2,
+        Element::NumText1,
+        Element::NumText2,
+        Element::LabelText1,
+        Element::LabelText2,
+        Element::Shadow,
+        Element::MarginDim
+    };
+
     // setup indexed pens
-    for ( Element e=Element::BorderLines; e!=Element::__count; ++e ) {
+    for ( auto & e : elements ) {
         m().penEntries[si( e )] =
             m_vgc.append < VGE::StoreIndexedPen > ( si( e ), pi( e ) );
     }
@@ -236,7 +234,8 @@ AstWcsGridRenderService::renderNow()
 
     sgp.setInputRect( m_imgRect );
     sgp.setOutputRect( m_outRect );
-    sgp.setFitsHeader( _getFitsHeaderforAst(m().fitsHeader) );
+    sgp.setFitsHeader( m().fitsHeader.join( "" ) );
+    sgp.setAxisDisplayInfo( m_axisDisplayInfos );
     sgp.setOutputVGComposer( & m_vgc );
 
 //    sgp.setPlotOption( "tol=0.001" ); // this can slow down the grid rendering!!!
@@ -277,13 +276,59 @@ AstWcsGridRenderService::renderNow()
     if ( ! system.isEmpty() ){
        //System only makes sense if the display axes are RA and DEC.
        if ( Carta::Lib::AxisDisplayInfo::isCelestialPlane( m_axisDisplayInfos) ){
-           sgp.setPlotOption( system );
+           sgp.setPlotOption( "System=" + system );
        }
    }
 
-    // labelOPtion for Ast
-    QString labelOPtion = _setDisplayLabelOptionforAst();
-    sgp.setPlotOption(labelOPtion);
+    //Turn axis  labelling off if we are not drawing the axes.
+    if (m_axes){
+        int labelCount = m_labels.size();
+        for ( int i = 0; i < labelCount; i++ ){
+            int axisIndex = i+ 1;
+            sgp.setPlotOption( QString("TextLab(%1)=1").arg(axisIndex) );
+            if ( m_labels[i].length() > 0 ){
+                QString baseLabel = m_labels[i];
+
+                //Format
+                Carta::Lib::AxisLabelInfo::Formats labelFormat = m_labelInfos[i].getFormat();
+                int precision = m_labelInfos[i].getPrecision();
+                QString completeFormat = _getDisplayFormat( labelFormat, precision );
+                if ( labelFormat != Carta::Lib::AxisLabelInfo::Formats::NONE ){
+                    if ( completeFormat.length() > 0 ){
+                        QString format = QString( "Format(%1)=%2").arg(axisIndex).arg( completeFormat );
+                        sgp.setPlotOption( format );
+
+                        //Label with format added - seems to be added automatically for J2000.
+                        if ( system != "J2000" ){
+                            baseLabel = baseLabel +"(" + completeFormat+")";
+                        }
+                    }
+                    else {
+                        QString digits = QString( "Digits(%1)=%2").arg(axisIndex).arg(precision);
+                        sgp.setPlotOption( digits );
+                    }
+                    QString label = QString( "Label(%1)=%2").arg(axisIndex).arg( baseLabel);
+                    sgp.setPlotOption( label );
+
+                    //Label location
+                    Carta::Lib::AxisLabelInfo::Locations labelLocation = m_labelInfos[i].getLocation();
+                    QString location = _getDisplayLocation( labelLocation );
+                    if ( location.length() > 0 ){
+                        QString edgeStr =QString("Edge(%1)=%2").arg(axisIndex).arg( location );
+                        sgp.setPlotOption( edgeStr );
+                    }
+                }
+                //If there is no format, turn axis labelling off
+                else {
+                    _turnOffLabels( &sgp, axisIndex );
+                }
+            }
+        }
+    }
+    else {
+        _turnOffLabels( &sgp, 1 );
+        _turnOffLabels( &sgp, 2 );
+    }
 
     // fonts
     sgp.setPlotOption( QString( "Font(TextLab1)=%1" ).arg( fi( Element::LabelText1 ).first ) );
@@ -344,118 +389,6 @@ AstWcsGridRenderService::renderNow()
     emit done( m_vgc.vgList(), m().lastSubmittedJobId );
 } // startRendering
 
-QString AstWcsGridRenderService::_setDisplayLabelOptionforAst()
-{
-    // get PermOrder
-    int NumAxis = m_axisDisplayInfos.size();
-    int fperm[NumAxis];
-    // int iperm[NumAxis];
-    for(int ii = 0; ii < NumAxis;ii=ii+1)
-    {
-        auto thisAxis = m_axisDisplayInfos[ii].getPermuteIndex();
-        fperm[thisAxis] = ii;
-        // iperm[ii] = thisAxis;
-
-    }
-
-    QStringList setPlotOption;
-
-    if (!m_axes)
-    {
-        // turn off
-        setPlotOption << "TextLab=0";
-        setPlotOption << "NumLab=0";
-    }
-    else
-    {
-        for ( int ii = 0; ii < 2; ii++ )
-        {
-            // Format
-            Carta::Lib::AxisLabelInfo::Formats labelFormat = m_labelInfos[ii].getFormat();
-            if ( labelFormat == Carta::Lib::AxisLabelInfo::Formats::NONE ||
-                 labelFormat == Carta::Lib::AxisLabelInfo::Formats::OTHER)
-            {
-                // turn off
-                setPlotOption << QString("TextLab(%1)=0").arg(ii+1);
-                setPlotOption << QString("NumLab(%1)=0").arg(ii+1);
-            }
-            else
-            {
-                // digit
-                int precision = m_labelInfos[ii].getPrecision();
-                //setPlotOption << QString("Digits(%1)=%2").arg(ii+1).arg(precision);
-
-                // location
-                Carta::Lib::AxisLabelInfo::Locations labelLocation = m_labelInfos[ii].getLocation();
-                QString location = _getDisplayLocation( labelLocation );
-                if ( location.length() > 0 )
-                {
-                    setPlotOption << QString("Edge(%1)=%2").arg(ii+1).arg( location );
-                }
-
-                // check axisType
-                int thisAxis = fperm[ii];
-                Carta::Lib::AxisInfo::KnownType axisType = m_axisDisplayInfos[thisAxis].getAxisType();
-                if( axisType == Carta::Lib::AxisInfo::KnownType::DIRECTION_LON)
-                {
-                    // TODO: check system == B1950/J2000/ICRS[default:hms, d] or Galactic/Ecliptic[default:d] or OTHER
-                    // set format
-                    if (labelFormat == Carta::Lib::AxisLabelInfo::Formats::HR_MIN_SEC)
-                    {
-                        setPlotOption << QString("Format(%1)=%2.%3").arg(ii+1).arg("hms").arg(precision);
-                    }
-                    else if (labelFormat == Carta::Lib::AxisLabelInfo::Formats::DECIMAL_DEG)
-                    {
-                        setPlotOption << QString("Format(%1)=%2.%3").arg(ii+1).arg("d").arg(precision);
-                    }
-                    else
-                    {
-                        setPlotOption << QString("Digits(%1)=%2").arg(ii+1).arg(precision);
-                    }
-
-                }
-                else if( axisType == Carta::Lib::AxisInfo::KnownType::DIRECTION_LAT)
-                {
-                    // TODO: check system == B1950/J2000/ICRS[default:dms, d] or Galactic/Ecliptic[default:d] or OTHER
-                    // set format
-                    if (labelFormat == Carta::Lib::AxisLabelInfo::Formats::DEG_MIN_SEC)
-                    {
-                        setPlotOption << QString("Format(%1)=%2.%3").arg(ii+1).arg("dms").arg(precision);
-                    }
-                    else if (labelFormat == Carta::Lib::AxisLabelInfo::Formats::DECIMAL_DEG)
-                    {
-                        setPlotOption << QString("Format(%1)=%2.%3").arg(ii+1).arg("d").arg(precision);
-                    }
-                    else
-                    {
-                        setPlotOption << QString("Digits(%1)=%2").arg(ii+1).arg(precision);
-                    }
-
-                }
-                else if(axisType == Carta::Lib::AxisInfo::KnownType::SPECTRAL)
-                {
-                    // check system for spectral
-                    setPlotOption << QString("system(%1)=%2").arg(ii+1).arg( "VRAD" );
-                    //setPlotOption << QString("system(%1)=%2").arg(ii+1).arg( "Freq" );
-                    setPlotOption << QString("Digits(%1)=%2").arg(ii+1).arg(precision);
-
-                    // set unit
-                    setPlotOption << QString("Unit(%1)=%2").arg(ii+1).arg("km/s");
-
-                }
-                else
-                {
-                    setPlotOption << QString("Digits(%1)=%2").arg(ii+1).arg(precision);
-                }
-            }
-
-        }
-    }
-
-    return setPlotOption.join(",");
-
-}
-
 void AstWcsGridRenderService::setAxisDisplayInfo( std::vector<Carta::Lib::AxisDisplayInfo> displayInfos ){
     if ( displayInfos.size() != m_axisDisplayInfos.size()){
         m_axisDisplayInfos = displayInfos;
@@ -466,7 +399,7 @@ void AstWcsGridRenderService::setAxisDisplayInfo( std::vector<Carta::Lib::AxisDi
         for ( int i = 0; i < infoCount; i++ ){
             if ( displayInfos[i] != m_axisDisplayInfos[i] ){
                 m_axisDisplayInfos[i] = displayInfos[i];
-                //m_vgValid = false;
+                m_vgValid = false;
             }
         }
     }
@@ -535,11 +468,9 @@ AstWcsGridRenderService::setPen( Carta::Lib::IWcsGridRenderService::Element e, c
 
     // if the list is valid, just change the entry directly
     if ( m_vgValid ) {
-        int penIndex=m().penEntries[si(e)];
-        m_vgc.set < VGE::StoreIndexedPen > ( penIndex, si( e ), pi( e ) );
-        int brushIndex = m().dimBrushIndex;
-        if ( e == Element::MarginDim && brushIndex >= 0 ) {
-            m_vgc.set < VGE::StoreIndexedBrush > ( brushIndex, 0, pi( e ).brush() );
+        m_vgc.set < VGE::StoreIndexedPen > ( m().penEntries[si( e )], si( e ), pi( e ) );
+        if ( e == Element::MarginDim ) {
+            m_vgc.set < VGE::StoreIndexedBrush > ( m().dimBrushIndex, 0, pi( e ).brush() );
         }
     }
 } // setPen
@@ -564,6 +495,35 @@ AstWcsGridRenderService::setAxisLabel( int axisIndex, const QString& label ){
     }
 }
 
+QString AstWcsGridRenderService::_getDisplayFormat( const Carta::Lib::AxisLabelInfo::Formats& baseFormat,
+        int decimals ) const {
+    QString displayFormat = "";
+    //Standard behaviour for an HMS axis is to have one extra decimal
+    //place compared to a DMS axis so they have roughly the same precision
+    //(an hour of arc is bigger than a degree of arc).
+    //Implemented by subtracting one from decimals (when it is positive) in the case of dms
+    int actualDecimals = decimals;
+    if ( baseFormat == Carta::Lib::AxisLabelInfo::Formats::DEG_MIN_SEC ){
+        displayFormat = "dms";
+        if ( decimals > 0 ){
+            actualDecimals = decimals - 1;
+        }
+    }
+    else if ( baseFormat == Carta::Lib::AxisLabelInfo::Formats::DECIMAL_DEG ){
+        displayFormat = "d";
+    }
+    else if ( baseFormat == Carta::Lib::AxisLabelInfo::Formats::HR_MIN_SEC ){
+        displayFormat = "hms";
+    }
+
+    if ( displayFormat.length() > 0 ){
+        if ( actualDecimals > 0 ){
+            displayFormat = displayFormat + "."+QString::number(actualDecimals);
+        }
+    }
+    return displayFormat;
+}
+
 QString AstWcsGridRenderService::_getDisplayLocation( const Carta::Lib::AxisLabelInfo::Locations& labelLocation ) const {
     QString location = "";
     if ( labelLocation == Carta::Lib::AxisLabelInfo::Locations::EAST ){
@@ -580,6 +540,8 @@ QString AstWcsGridRenderService::_getDisplayLocation( const Carta::Lib::AxisLabe
     }
     return location;
 }
+
+
 
 //const QPen &
 //AstWcsGridRenderService::pen( Carta::Lib::IWcsGridRenderService::Element e )
@@ -647,19 +609,19 @@ AstWcsGridRenderService::_getSystem( ){
    switch ( m().knownSkyCS )
    {
    case KS::J2000 :
-       system = "System=FK5, Equinox=J2000";
+       system = "J2000";
        break;
    case KS::B1950 :
-       system = "System=FK4, Equinox=B1950";
+       system = "FK4";
        break;
    case KS::ICRS :
-       system = "System=ICRS";
+       system = "ICRS";
        break;
    case KS::Galactic :
-       system = "System=GALACTIC";
+       system = "GALACTIC";
        break;
    case KS::Ecliptic :
-       system = "System=ECLIPTIC";
+       system = "ECLIPTIC";
        break;
    default :
        system = "";
@@ -675,5 +637,10 @@ AstWcsGridRenderService::_turnOffTicks(WcsPlotterPluginNS::AstGridPlotter* sgp){
     sgp->setPlotOption("MajTickLen(2)=0");
     sgp->setPlotOption("MinTickLen(1)=0");
     sgp->setPlotOption("MinTickLen(2)=0");
+}
+
+void AstWcsGridRenderService::_turnOffLabels( WcsPlotterPluginNS::AstGridPlotter* sgp, int index ){
+    sgp->setPlotOption( QString("TextLab(%1)=0").arg(index));
+    sgp->setPlotOption( QString("NumLab(%1)=0").arg(index));
 }
 }

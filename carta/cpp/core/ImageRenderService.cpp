@@ -6,7 +6,6 @@
 #include "CartaLib/LinearMap.h"
 #include <QColor>
 #include <QPainter>
-#include <QElapsedTimer>
 
 namespace NdArray = Carta::Lib::NdArray;
 
@@ -240,20 +239,14 @@ Service::~Service()
 QPointF
 Service::img2screen( const QPointF & p )
 {
-    return image2screen( p, m_pan, m_zoom, m_outputSize );
-}
-
-QPointF
-Service::image2screen( const QPointF& p, const QPointF& pan,
-        double zoom, const QSize& outputSize ) const {
-    double icx = pan.x();
-    double scx = outputSize.width() / 2.0;
-    double icy = pan.y();
-    double scy = outputSize.height() / 2.0;
+    double icx = m_pan.x();
+    double scx = m_outputSize.width() / 2.0;
+    double icy = m_pan.y();
+    double scy = m_outputSize.height() / 2.0;
 
     /// \todo cache xmap/ymap, update with zoom/pan/resize
-    Carta::Lib::LinearMap1D xmap( scx, scx + zoom, icx, icx + 1 );
-    Carta::Lib::LinearMap1D ymap( scy, scy + zoom, icy, icy - 1 );
+    Carta::Lib::LinearMap1D xmap( scx, scx + m_zoom, icx, icx + 1 );
+    Carta::Lib::LinearMap1D ymap( scy, scy + m_zoom, icy, icy - 1 );
     QPointF res;
     res.rx() = xmap.inv( p.x() );
     res.ry() = ymap.inv( p.y() );
@@ -263,21 +256,15 @@ Service::image2screen( const QPointF& p, const QPointF& pan,
 QPointF
 Service::screen2img( const QPointF & p )
 {
-    return screen2image( p, m_pan, m_zoom, m_outputSize );
-}
-
-QPointF
-Service::screen2image( const QPointF & p, const QPointF& pan, double zoom,
-        const QSize& outputSize ) const {
-    double icx = pan.x();
-    double scx = outputSize.width() / 2.0;
-    double icy = pan.y();
-    double scy = outputSize.height() / 2.0;
+    double icx = m_pan.x();
+    double scx = m_outputSize.width() / 2.0;
+    double icy = m_pan.y();
+    double scy = m_outputSize.height() / 2.0;
 
     /// \todo cache xmap/ymap, update with zoom/pan/resize
 
-    Carta::Lib::LinearMap1D xmap( scx, scx + zoom, icx, icx + 1 );
-    Carta::Lib::LinearMap1D ymap( scy, scy + zoom, icy, icy - 1 );
+    Carta::Lib::LinearMap1D xmap( scx, scx + m_zoom, icx, icx + 1 );
+    Carta::Lib::LinearMap1D ymap( scy, scy + m_zoom, icy, icy - 1 );
     QPointF res;
     res.rx() = xmap.apply( p.x() );
     res.ry() = ymap.apply( p.y() );
@@ -290,37 +277,40 @@ Service::internalRenderSlot()
     //static int renderCount = 0;
     //qDebug() << "Image render" << renderCount++ << "xyz";
 
+    // raw double to base64 converter
+    auto d2hex = [] (double x) -> QString {
+        return QByteArray( (char *) ( & x ), sizeof( x ) ).toBase64();
+    };
+
     double clipMin, clipMax;
     m_pixelPipelineRaw-> getClips( clipMin, clipMax );
 
     QRgb nanColor = m_nanColor.rgb();
-    if ( m_defaultNan )
-    {
-        if(std::isnan(clipMin) && std::isnan(clipMax))
-        {
-            // special case: [clipMin, clipMax] = nan
-            nanColor = qRgb( 0,0,0 );
-        }
-        else
-        {
-            // general case
-            m_pixelPipelineRaw->convertq( clipMin, nanColor );
-        }
+    if ( m_defaultNan ){
+        m_pixelPipelineRaw->convertq( clipMin, nanColor );
     }
 
     // cache id will be concatenation of:
     // view id
     // pipeline id
+    // output size
+    // pan
+    // zoom
     // nan
     // pixel pipeline cache settings
-    QString cacheId = QString( "%1/%2//%8" )
+    // Floats are binary-encoded (base64)
+    QString cacheId = QString( "%1/%2/%3x%4/%5,%6/%7/%8" )
                           .arg( m_inputViewCacheId )
                           .arg( m_pixelPipelineCacheId )
+                          .arg( m_outputSize.width() )
+                          .arg( m_outputSize.height() )
+                          .arg( d2hex( m_pan.x() ) )
+                          .arg( d2hex( m_pan.y() ) )
+                          .arg( d2hex( m_zoom ) )
                           .arg( QString::number(nanColor) );
 
 
-    // disable pixelPipelineCache in case [clipMin, clipMax] = nan
-    if ( m_pixelPipelineCacheSettings.enabled && !std::isnan(clipMin) && !std::isnan(clipMax)){
+    if ( m_pixelPipelineCacheSettings.enabled ) {
         cacheId += QString( "/1/%1/%2" )
                        .arg( int (m_pixelPipelineCacheSettings.interpolated) )
                        .arg( m_pixelPipelineCacheSettings.size );
@@ -337,6 +327,14 @@ Service::internalRenderSlot()
         ~Scope() { /*qDebug() << "internalRenderSlot done";*/ } }
     debugScopeGuard;
 
+    auto cachedImage = m_frameCache.object( cacheId );
+    if ( cachedImage ) {
+        //qDebug() << "frame cache hit";
+        emit done( * cachedImage, m_lastSubmittedJobId );
+        return;
+    }
+    //qDebug() << "frame cache miss";
+
     if ( ! m_inputView ) {
         qCritical() << "input view not set";
         qDebug() << "xyz internal renderslot" << m_inputView.get() << this;
@@ -348,19 +346,12 @@ Service::internalRenderSlot()
         return;
     }
 
-    // seems it is copying, so no need to copy again for more safe usage
-    auto cachedRawImage = m_frameCache.object(cacheId);
 
-    // start the timer
-    QElapsedTimer timer;
-    timer.start();
 
     // render the frame if needed
-    if (!cachedRawImage) {
-        // cacheRaw miss
+    if ( m_frameImage.isNull() ) {
 
-        // disable pixelPipelineCache in case [clipMin, clipMax] = nan
-        if ( pixelPipelineCacheSettings().enabled && !std::isnan(clipMin) && !std::isnan(clipMax) ) {
+        if ( pixelPipelineCacheSettings().enabled ) {
             if ( pixelPipelineCacheSettings().interpolated ) {
                 if ( ! m_cachedPPinterp ) {
                     m_cachedPPinterp.reset( new Lib::PixelPipeline::CachedPipeline < true > () );
@@ -382,14 +373,6 @@ Service::internalRenderSlot()
             ::iView2qImage( m_inputView.get(), * m_pixelPipelineRaw, m_frameImage, nanColor );
         }
     }
-    else
-    {
-        // cacheRaw hit
-        m_frameImage = *cachedRawImage;
-    }
-
-    // end the timer
-    qDebug() << "Time for applying the colormap on the current view of image:" << timer.elapsed() << "ms";
 
     // prepare output
     QImage img( m_outputSize, OptimalQImageFormat );
@@ -426,7 +409,7 @@ Service::internalRenderSlot()
 
         // more debugging - draw pixel grid
         // \todo need to add clipping if we want to expose this as a functionality
-        if ( CARTA_RUNTIME_CHECKS && zoom() > 5 ) {
+        if ( true && zoom() > 5 ) {
             p.setRenderHint( QPainter::Antialiasing, true );
             double alpha = Carta::Lib::linMap( zoom(), 5, 32, 0.01, 0.2 );
             //qDebug() << "alpha="<<alpha;
@@ -449,19 +432,21 @@ Service::internalRenderSlot()
                 p.drawLine( QPointF( 0, pt.y() ), QPointF( outputSize().width(), pt.y() ) );
             }
         }
-    }
-
-    if (!cachedRawImage) {
-        // insert this image into frame cache, they may be alterd by emit done, so change to insert first.
-        if (m_frameImage.byteCount() >0 && img.byteCount()>0) {
-            m_frameCache.insert( cacheId, new QImage( m_frameImage ), img.byteCount() );
-        } else {
-            qDebug() << "m_frameCache is empty, will not be inserted";
+        // debuggin: put a yellow stamp on the image, so that next time it's recalled
+        // it'll have 'cached' stamped on it
+        if ( CARTA_RUNTIME_CHECKS ) {
+            p.setPen( QColor( "yellow" ) );
+            p.drawText( img.rect(), Qt::AlignRight | Qt::AlignBottom, "Cached" );
         }
     }
 
     // report result
     emit done( img, m_lastSubmittedJobId );
+
+
+
+    // insert this image into frame cache
+    m_frameCache.insert( cacheId, new QImage( img ), img.byteCount() );
 
 } // internalRenderSlot
 

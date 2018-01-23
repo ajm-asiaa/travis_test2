@@ -162,15 +162,6 @@ qx.Class.define("skel.widgets.Profile.SettingsProfilesRest", {
                 var params = "restUnitFreq:"+restUnits+",name:"+this.m_curveName;
                 this.m_connector.sendCommand( cmd, params, null );
              }
-            
-        },
-        
-        /**
-         * Store the name of the selected profile.
-         * @param name {String} - an identifier for the selected profile.
-         */
-        setCurveName : function( name ){
-        	this.m_curveName = name;
         },
         
         /**
@@ -202,22 +193,19 @@ qx.Class.define("skel.widgets.Profile.SettingsProfilesRest", {
         
         /**
          * A new profile curve has been selected.
-         * @param restFrequency {Number} - the rest frequency.
-         * @param restFrequencyUnits {boolean} - true if the units are rest frequency; false, if
-         * 		the units are wavelength.
-         * @param restUnits {String} - the units of rest frequency (Hz, mm, etc).
+         * @param curveInfo {Object} - information about the selected curve.
          */
-        update : function(restFrequency, restFrequencyUnits, restUnits  ){
+        update : function( curveInfo ){
+            this.m_curveName = curveInfo.name;
             if ( this.m_freqText !== null ){
                 if ( this.m_freqTextListenId !== null ){
                     this.m_freqText.removeListenerById( this.m_freqTextListenId );
                 }
-                this.m_freqText.setValue( restFrequency );
+                this.m_freqText.setValue( curveInfo.restFrequency );
                 this.m_freqTextListenId = this.m_freqText.addListener( "textChanged", 
                         this._sendRestFreqCmd, this );
             }
-           
-            var freq = restFrequencyUnits;
+            var freq = curveInfo.restFrequencyUnits;
             if ( this.m_freqRadio.getValue() != freq ){
                 if ( this.m_unitListenId !== null ){
                     this.m_freqRadio.removeListenerById( this.m_unitListenId );
@@ -230,11 +218,11 @@ qx.Class.define("skel.widgets.Profile.SettingsProfilesRest", {
             }
             if ( this.m_freqRadio.getValue()){
                 this.m_freqUnitsSelect.setSelectItems( this.m_unitsFreq );
-                this.m_freqUnitsSelect.setSelectValue( restUnits );
+                this.m_freqUnitsSelect.setSelectValue( curveInfo.restUnitFreq );
             }
             else {
                 this.m_freqUnitsSelect.setSelectItems( this.m_unitsWave );
-                this.m_freqUnitsSelect.setSelectValue( restUnits );
+                this.m_freqUnitsSelect.setSelectValue( curveInfo.restUnitWave );
             }
             this.m_freqUnitsSelectListenId = this.m_freqUnitsSelect.addListener( "selectChanged", 
                     this._sendUnitsCmd, this );

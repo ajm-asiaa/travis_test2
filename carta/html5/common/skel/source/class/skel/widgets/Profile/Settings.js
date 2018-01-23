@@ -40,22 +40,28 @@ qx.Class.define("skel.widgets.Profile.Settings", {
             this.m_pages[this.m_INDEX_PROFILES] = new skel.widgets.Profile.SettingsProfiles();
             this.m_pages[this.m_INDEX_CURVES] = new skel.widgets.Profile.SettingsCurves();
             this.m_pages[this.m_INDEX_RANGE] = new skel.widgets.Profile.SettingsRange();
-            this.m_pages[this.m_INDEX_FIT] = new skel.widgets.Profile.SettingsFit();
+            
             for ( var i = 0; i < this.m_pages.length; i++ ){
                 this.m_tabView.add( this.m_pages[i] );
             }
         },
         
         /**
-         * Update the UI based on server-side values.
-         * @param profilePrefs {Object} - server-side fit parameters.
+         * Callback for when profile preference state changes on the server.
          */
-        prefUpdate : function( profilePrefs ){
-            this.m_pages[this.m_INDEX_PLOT].prefUpdate( profilePrefs );
-            this.m_pages[this.m_INDEX_FIT].prefUpdate( profilePrefs );
-            this.m_pages[this.m_INDEX_PROFILES].prefUpdate( profilePrefs );
-            var tabIndex = profilePrefs.tabIndex;
-            this._selectTab( tabIndex );
+        _profileCB : function(){
+            var val = this.m_sharedVar.get();
+            if ( val ){
+                try {
+                    var profilePrefs = JSON.parse( val );
+                    this.m_pages[this.m_INDEX_PLOT].prefUpdate( profilePrefs );
+                    var tabIndex = profilePrefs.tabIndex;
+                    this._selectTab( tabIndex );
+                }
+                catch( err ){
+                    console.log( "Could not parse: "+val+" error: "+err );
+                }
+            }
         },
         
         /**
@@ -69,10 +75,9 @@ qx.Class.define("skel.widgets.Profile.Settings", {
                     this.m_pages[this.m_INDEX_CURVES].dataUpdate( profileData );
                     this.m_pages[this.m_INDEX_PROFILES].dataUpdate( profileData );
                     this.m_pages[this.m_INDEX_RANGE].dataUpdate( profileData );
-                    this.m_pages[this.m_INDEX_FIT].dataUpdate( profileData );
                 }
                 catch( err ){
-                    console.log( "Settings Could not parse: "+val+" error: "+err );
+                    console.log( "TabSettings Could not parse: "+val+" error: "+err );
                 }
             }
         },
@@ -86,7 +91,9 @@ qx.Class.define("skel.widgets.Profile.Settings", {
             this.m_sharedVarData = this.m_connector.getSharedVar( dataPath );
             this.m_sharedVarData.addCB( this._profileDataCB.bind( this));
             this._profileDataCB();
-          
+            this.m_sharedVar = this.m_connector.getSharedVar( this.m_id );
+            this.m_sharedVar.addCB( this._profileCB.bind( this));
+            this._profileCB();
         },
         
         
@@ -102,20 +109,11 @@ qx.Class.define("skel.widgets.Profile.Settings", {
             this._register();
         },
         
-        /**
-         * Set whether or not manual fit guesses will be used.
-         * @param manual {boolean} - true if manual fit guesses will be used;
-         *      false otherwise.
-         */
-        setManualFitGuesses : function( manual ){
-            this.m_pages[this.m_INDEX_FIT].setManual( manual );
-        },
-      
+        m_sharedVar : null,
         m_sharedVarData : null,
         m_INDEX_RANGE : 1,
-        m_INDEX_CURVES : 4,
+        m_INDEX_CURVES : 3,
         m_INDEX_PROFILES : 2,
-        m_INDEX_FIT : 3,
         m_INDEX_PLOT : 0
     }
 });

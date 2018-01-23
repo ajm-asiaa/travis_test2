@@ -6,36 +6,12 @@
 #include "ContourConrec.h"
 #include "IImage.h"
 #include "LineCombiner.h"
+
 #include <cmath>
 #include <QString>
 #include <QDebug>
 
-using namespace Carta::Lib::Algorithms;
 typedef std::vector < double > VD;
-
-const double kernel_gaussian3[9] =
-{ 0.02479795, 0.10787775, 0.02479795,
-  0.10787775, 0.46929721, 0.10787775,
-  0.02479795, 0.10787775, 0.02479795};
-
-const double kernel_gaussian5[25] =
-{ 0.00178843, 0.01031068, 0.01809162, 0.01031068, 0.00178843,
-  0.01031068, 0.05944323, 0.10430201, 0.05944323, 0.01031068,
-  0.01809162, 0.10430201, 0.18301345, 0.10430201, 0.01809162,
-  0.01031068, 0.05944323, 0.10430201, 0.05944323, 0.01031068,
-  0.00178843, 0.01031068, 0.01809162, 0.01031068, 0.00178843};
-
-const double kernel_box3[9] =
-{ 1.0/9.0, 1.0/9.0, 1.0/9.0,
-  1.0/9.0, 1.0/9.0, 1.0/9.0,
-  1.0/9.0, 1.0/9.0, 1.0/9.0};
-
-const double kernel_box5[25] =
-{ 1.0/25.0, 1.0/25.0, 1.0/25.0, 1.0/25.0, 1.0/25.0,
-  1.0/25.0, 1.0/25.0, 1.0/25.0, 1.0/25.0, 1.0/25.0,
-  1.0/25.0, 1.0/25.0, 1.0/25.0, 1.0/25.0, 1.0/25.0,
-  1.0/25.0, 1.0/25.0, 1.0/25.0, 1.0/25.0, 1.0/25.0,
-  1.0/25.0, 1.0/25.0, 1.0/25.0, 1.0/25.0, 1.0/25.0};
 
 /*
  * The code below is modified version of Paul Bourke's algorithm:
@@ -45,6 +21,7 @@ const double kernel_box5[25] =
  * The original is included at the bottom for reference, in case the web page
  * disappears.
  */
+
 /*
    Derivation from the fortran version of CONREC by Paul Bourke
    view            ! view of the data
@@ -55,57 +32,38 @@ const double kernel_box5[25] =
    nc              ! number of contour levels
    z               ! contour levels in increasing order
 */
-
 static Carta::Lib::Algorithms::ContourConrec::Result
-conrecFaster( Carta::Lib::NdArray::RawViewInterface * view, int ilb, int iub, int jlb, int jub,
-        const VD & xCoords, const VD & yCoords, int nc, VD z,
-        const ContourConrec::ContourMode mode=ContourConrec::ContourMode::ORIGINAL){
-
-    int ghost = 0; // The useless edge width when doing filter.
-    const double kernal_default[1] = {1.0};
-    const double *kernel = &kernal_default[0];
-    switch (mode) {
-        case ContourConrec::ContourMode::GAUSSIANBLUR_3:
-            ghost = 1;
-            kernel = &kernel_gaussian3[0];
-            break;
-        case ContourConrec::ContourMode::GAUSSIANBLUR_5:
-            ghost = 2;
-            kernel = &kernel_gaussian5[0];
-            break;
-        case ContourConrec::ContourMode::BOXBLUR_3:
-            ghost = 1;
-            kernel = &kernel_box3[0];
-            break;
-        case ContourConrec::ContourMode::BOXBLUR_5:
-            ghost = 2;
-            kernel = &kernel_box5[0];
-            break;
-        default:
-            break;
-    }
-
+conrecFaster(
+    Carta::Lib::NdArray::RawViewInterface * view,
+    int ilb,
+    int iub,
+    int jlb,
+    int jub,
+    const VD & xCoords,
+    const VD & yCoords,
+    int nc,
+    double * z
+    )
+{
     // we will only need two rows in memory at any given time
-    // int nRows = jub - jlb + 1;
-    int nCols = iub - ilb - (2*ghost) + 1;
-    int prepareCols = iub - ilb + 1;
-    int prepareRows = 2*ghost + 1;
-    int area = prepareCols*prepareRows;
-    double * rows[2] { nullptr, nullptr };
-    std::vector < double > row1( nCols ), row2( nCols ),
-                           prepareArea( area );
+//    int nRows = jub - jlb + 1;
+    int nCols = iub - ilb + 1;
+    double * rows[2] {
+        nullptr, nullptr
+    };
+    std::vector < double > row1( nCols ), row2( nCols );
     rows[0] = & row1[0];
     rows[1] = & row2[0];
     int nextRowToReadIn = 0;
-    int nextFilterStart = 0;
 
-    auto updateRows = [&]() -> void {
+    auto updateRows = [&] () -> void {
         CARTA_ASSERT( nextRowToReadIn < view-> dims()[1] );
 
+        // make a row view into the view
         SliceND rowSlice;
-        int update = ( nextRowToReadIn > 0 ? 1 : prepareRows );
-        rowSlice.next().start( nextRowToReadIn ).end( nextRowToReadIn + update );
+        rowSlice.next().start( nextRowToReadIn ).end( nextRowToReadIn + 1 );
         auto rawRowView = view-> getView( rowSlice );
+        nextRowToReadIn++;
 
         // make a double view of this raw row view
         Carta::Lib::NdArray::Double dview( rawRowView, true );
@@ -116,28 +74,13 @@ conrecFaster( Carta::Lib::NdArray::RawViewInterface * view, int ilb, int iub, in
         // gain and lot more complicated algorithm
         row1 = row2;
 
-        // Prepare Data for possible filter
-        int t = nextRowToReadIn*prepareCols;
-        dview.forEach( [&] ( const double & val ) {
-            // To improve the performance, the prepareArea also update only one row
-            // by computing the module
-            prepareArea[(t++)%area] = val;
-        });
-
-        // Do the filter
-        for ( int i=0; i<nCols; i++){
-            row2[i] = 0;
-            int elems = (2*ghost+1)*(2*ghost+1);
-            for ( int e=0; e<elems; e++){
-                int row = e/(2*ghost+1) + nextFilterStart;
-                int col = e%(2*ghost+1);
-                int index = (row*prepareCols + col + i) % area;
-                row2[i] += kernel[e]*prepareArea[index];
-            }
-        }
-
-        nextRowToReadIn += update;
-        nextFilterStart ++;
+        // read in the data into row2
+        int i = 0;
+        dview.forEach([&] ( const double & val ) {
+                          row2[i++] = val;
+                      }
+                      );
+        CARTA_ASSERT( i == nCols );
     };
     updateRows();
 
@@ -146,6 +89,13 @@ conrecFaster( Carta::Lib::NdArray::RawViewInterface * view, int ilb, int iub, in
 //        return doubleView.get( { col, row }
 //                               );
 //    };
+
+    // to keep the data accessor easy, we use this lambda, and hope the compiler
+    // optimizes it into an inline expression... :)
+    auto acc = [&] ( int col, int row ) {
+        row -= nextRowToReadIn - 2;
+        return rows[row][col];
+    };
 
     Carta::Lib::Algorithms::ContourConrec::Result result;
     if ( nc < 1 ) {
@@ -156,50 +106,57 @@ conrecFaster( Carta::Lib::NdArray::RawViewInterface * view, int ilb, int iub, in
 #define xsect( p1, p2 ) ( h[p2] * xh[p1] - h[p1] * xh[p2] ) / ( h[p2] - h[p1] )
 #define ysect( p1, p2 ) ( h[p2] * yh[p1] - h[p1] * yh[p2] ) / ( h[p2] - h[p1] )
 
-    int m1, m2, m3, case_value, sh[5];
-    double x1 = 0, x2 = 0, y1 = 0, y2 = 0;
-    double h[5], xh[5], yh[5];
-    int im[4] = { 0, 1, 1, 0},
-        jm[4] = { 0, 0, 1, 1};
+    int m1, m2, m3, case_value;
+    double dmin, dmax, x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+    int i, j, k, m;
+    double h[5];
+    int sh[5];
+    double xh[5], yh[5];
+    int im[4] = {
+        0, 1, 1, 0
+    }, jm[4] = {
+        0, 0, 1, 1
+    };
     int castab[3][3][3] = {
         { { 0, 0, 8 }, { 0, 2, 5 }, { 7, 6, 9 } },
         { { 0, 3, 4 }, { 1, 3, 1 }, { 4, 3, 0 } },
         { { 9, 6, 7 }, { 5, 2, 0 }, { 8, 0, 0 } }
     };
+    double temp1, temp2;
 
     // original code went from bottom to top, not sure why
     //    for ( j = ( jub - 1 ) ; j >= jlb ; j-- ) {
-    for ( int j = jlb ; j < jub-2*ghost ; j++ ) {
+    for ( j = jlb ; j < jub ; j++ ) {
         updateRows();
-        for ( int i = ilb ; i < iub-2*ghost ; i++ ) {
-            double temp1 = std::min( rows[0][i]  , rows[1][i]   );
-            double temp2 = std::min( rows[0][i+1], rows[1][i+1] );
-            double dmin = std::min( temp1, temp2 );
+        for ( i = ilb ; i < iub ; i++ ) {
+            temp1 = std::min( acc( i, j ), acc( i, j + 1 ) );
+            temp2 = std::min( acc( i + 1, j ), acc( i + 1, j + 1 ) );
+            dmin = std::min( temp1, temp2 );
+
             // early abort if one of the values is not finite
             if ( ! std::isfinite( dmin ) ) {
                 continue;
             }
-            temp1 = std::max( rows[0][i]  , rows[1][i]   );
-            temp2 = std::max( rows[0][i+1], rows[1][i+1] );
-            double dmax = std::max( temp1, temp2 );
+            temp1 = std::max( acc( i, j ), acc( i, j + 1 ) );
+            temp2 = std::max( acc( i + 1, j ), acc( i + 1, j + 1 ) );
+            dmax = std::max( temp1, temp2 );
             if ( dmax < z[0] || dmin > z[nc - 1] ) {
                 continue;
             }
-            for ( int k = 0 ; k < nc ; k++ ) {
+            for ( k = 0 ; k < nc ; k++ ) {
                 if ( z[k] < dmin || z[k] > dmax ) {
                     continue;
                 }
-                for ( int m = 4 ; m >= 0 ; m-- ) {
+                for ( m = 4 ; m >= 0 ; m-- ) {
                     if ( m > 0 ) {
-                        int ii = i + im[m-1], jj = jm[m-1];
-                        h[m] = rows[jj][ii] - z[k];
-                        xh[m] = xCoords[i + ghost + im[m - 1]];
-                        yh[m] = yCoords[j + ghost + jm[m - 1]];
+                        h[m] = acc( i + im[m - 1], j + jm[m - 1] ) - z[k];
+                        xh[m] = xCoords[i + im[m - 1]];
+                        yh[m] = yCoords[j + jm[m - 1]];
                     }
                     else {
                         h[0] = 0.25 * ( h[1] + h[2] + h[3] + h[4] );
-                        xh[0] = 0.50 * ( xCoords[i + ghost] + xCoords[i + ghost + 1] );
-                        yh[0] = 0.50 * ( yCoords[j + ghost] + yCoords[j + ghost + 1] );
+                        xh[0] = 0.50 * ( xCoords[i] + xCoords[i + 1] );
+                        yh[0] = 0.50 * ( yCoords[j] + yCoords[j + 1] );
                     }
                     if ( h[m] > 0.0 ) {
                         sh[m] = 1;
@@ -211,6 +168,7 @@ conrecFaster( Carta::Lib::NdArray::RawViewInterface * view, int ilb, int iub, in
                         sh[m] = 0;
                     }
                 }
+
                 /*
                    Note: at this stage the relative heights of the corners and the
                    centre are in the h array, and the corresponding coordinates are
@@ -219,12 +177,12 @@ conrecFaster( Carta::Lib::NdArray::RawViewInterface * view, int ilb, int iub, in
                    Each triangle is then indexed by the parameter m, and the 3
                    vertices of each triangle are indexed by parameters m1,m2,and m3.
                    It is assumed that the centre of the box is always vertex 2
-                   though this is important only when all 3 vertices lie exactly on
+                   though this isimportant only when all 3 vertices lie exactly on
                    the same contour level, in which case only the side of the box
                    is drawn.
                       vertex 4 +-------------------+ vertex 3
                                | \               / |
-                               |   \    m=3    /   |
+                               |   \    m-3    /   |
                                |     \       /     |
                                |       \   /       |
                                |  m=2    X   m=2   |       the centre is vertex 0
@@ -235,7 +193,7 @@ conrecFaster( Carta::Lib::NdArray::RawViewInterface * view, int ilb, int iub, in
                       vertex 1 +-------------------+ vertex 2
                 */
                 /* Scan each triangle in the box */
-                for ( int m = 1 ; m <= 4 ; m++ ) {
+                for ( m = 1 ; m <= 4 ; m++ ) {
                     m1 = m;
                     m2 = 0;
                     if ( m != 4 ) {
@@ -342,7 +300,7 @@ ContourConrec::setLevels( const std::vector < double > & levels )
 }
 
 ContourConrec::Result
-ContourConrec::compute(NdArray::RawViewInterface * view, QString typeName)
+ContourConrec::compute( NdArray::RawViewInterface * view )
 {
     // if no input view was set, we are done
     if ( ! view || m_levels.size() == 0 ) {
@@ -384,42 +342,44 @@ ContourConrec::compute(NdArray::RawViewInterface * view, QString typeName)
         ycoords[row] = row;
     }
 
+    Result result1 =
+        conrecFaster(
+            view,
+            0,
+            m_nCols - 1,
+            0,
+            m_nRows - 1,
+            xcoords,
+            ycoords,
+            m_levels.size(),
+            & sortedRawLevels[0] );
+
     Result result;
-    QString notify = "[contour] apply Conrec Algorithm with ";
-
-    qDebug() << notify + typeName;
-    ContourConrec::ContourMode mode = ContourConrec::ContourMode::ORIGINAL;
-
-    if (typeName == "Gaussian blur 3x3"){
-        mode = ContourConrec::ContourMode::GAUSSIANBLUR_3;
-    } else if (typeName == "Box blur 3x3"){
-        mode = ContourConrec::ContourMode::BOXBLUR_3;
-    } else if (typeName == "Gaussian blur 5x5"){
-        mode = ContourConrec::ContourMode::GAUSSIANBLUR_5;
-    } else if (typeName == "Box blur 5x5"){
-        mode = ContourConrec::ContourMode::BOXBLUR_5;
-    }
-
-    result = conrecFaster( view, 0, m_nCols - 1, 0, m_nRows - 1,
-                xcoords, ycoords, m_levels.size(), sortedRawLevels,
-                mode );
-
-    if (typeName == "Line combiner") {
-
-        QRectF rect( 0, 0, m_nCols, m_nRows);
-
-        for( size_t i = 0 ; i < m_levels.size() ; ++ i ) {
-            Carta::Lib::Algorithms::LineCombiner lc( rect, m_nRows+1, m_nCols+1, 1e-9);
-            std::vector < QPolygonF > & v = result[i];
-            for( QPolygonF & poly : v) {
-                for( int i = 0 ; i < poly.size() - 1 ; ++ i ) {
-                    lc.add( poly[i], poly[i+1]);
-                }
+    QRectF rect( 0, 0, m_nCols, m_nRows);
+    for( size_t i = 0 ; i < m_levels.size() ; ++ i ) {
+        Carta::Lib::Algorithms::LineCombiner lc( rect, m_nRows+1, m_nCols + 1, 1e-9);
+        std::vector < QPolygonF > & v = result1[i];
+        for( QPolygonF & poly : v) {
+            for( int i = 0 ; i < poly.size() - 1 ; ++ i ) {
+                lc.add( poly[i], poly[i+1]);
             }
-            result.push_back( lc.getPolygons());
-            qDebug() << "contour level=" << i << "compress" << v.size() << "-->" << result.back().size();
         }
+        result.push_back( lc.getPolygons());
+        qDebug() << "compress" << v.size() << "-->" << result.back().size();
     }
+
+//    Result result =
+//        conrecFaster(
+//            view,
+//            0,
+//            m_nCols - 1,
+//            0,
+//            m_nRows - 1,
+//            xcoords,
+//            ycoords,
+//            m_levels.size(),
+//            & sortedRawLevels[0] );
+
 
     // now we 'unsort' the contours based on the requested order
     Result unsortedResult( m_levels.size() );

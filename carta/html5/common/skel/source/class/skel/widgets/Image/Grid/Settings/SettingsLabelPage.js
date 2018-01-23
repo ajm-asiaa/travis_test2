@@ -14,17 +14,13 @@ qx.Class.define("skel.widgets.Image.Grid.Settings.SettingsLabelPage", {
      */
     construct : function( ) {
         this.base(arguments, "Settings", "");
-        if ( typeof mImport !== "undefined"){
-        	this.m_connector = mImport("connector");
-        }
+        this.m_connector = mImport("connector");
         this._init();
         
-        if ( this.m_connector != null ){
-        	var pathDict = skel.widgets.Path.getInstance();
-        	this.m_sharedVar = this.m_connector.getSharedVar(pathDict.FONTS);
-        	this.m_sharedVar.addCB(this._fontsChangedCB.bind(this));
-        	this._fontsChangedCB();
-        }
+        var pathDict = skel.widgets.Path.getInstance();
+        this.m_sharedVar = this.m_connector.getSharedVar(pathDict.FONTS);
+        this.m_sharedVar.addCB(this._fontsChangedCB.bind(this));
+        this._fontsChangedCB();
     },
 
     members : {
@@ -111,7 +107,7 @@ qx.Class.define("skel.widgets.Image.Grid.Settings.SettingsLabelPage", {
          */
         setControls : function( controls ){
             if ( typeof controls.grid.font !== "undefined"){
-            	this.setFontSize( controls.grid.font.size );
+                this.m_fontSizeSpin.setValue( controls.grid.font.size );
                 this.m_familyCombo.setComboValue( controls.grid.font.family );
             }
             if ( typeof controls.grid.labelFormats !== "undefined"){
@@ -121,53 +117,28 @@ qx.Class.define("skel.widgets.Image.Grid.Settings.SettingsLabelPage", {
                 this.m_decimalSpin.setMaximum( controls.grid.decimalsMax );
             }
             if ( typeof controls.grid.decimals !== "undefined"){
-            	this.setPrecision( controls.grid.decimals );
+                this.m_decimalSpin.setValue( controls.grid.decimals );
             }
-        },
-        
-        /**
-         * Set the font size.
-         * @param fontSize {Number} - the size of the font.
-         */
-        setFontSize : function( fontSize ){
-        	if ( this.m_fontSizeSpin.getValue() != fontSize ){
-        		this.m_fontSizeSpin.setValue( fontSize );
-        	}
-        },
-        
-        /**
-         * Set the precision of the labels.
-         * @param precision {Number} - the precision to use when
-         * 		displaying labels.
-         */
-        setPrecision : function( precision ){
-        	if ( this.m_decimalSpin.getValue() != precision ){
-        		this.m_decimalSpin.setValue( precision );
-        	}
         },
         
         /**
          * Send the number of decimals to use for axis labels to the server.
          */
         _sendDecimals : function(){
-        	if ( this.m_connector != null ){
-        		var params = "decimals:"+this.m_decimalSpin.getValue();
-        		var path = skel.widgets.Path.getInstance();
-        		var cmd = this.m_id + path.SEP_COMMAND + "setLabelDecimals";
-        		this.m_connector.sendCommand( cmd, params, function(){});
-        	}
+            var params = "decimals:"+this.m_decimalSpin.getValue();
+            var path = skel.widgets.Path.getInstance();
+            var cmd = this.m_id + path.SEP_COMMAND + "setLabelDecimals";
+            this.m_connector.sendCommand( cmd, params, function(){});
         },
         
         /**
          * Send the label font size to the server.
          */
         _sendFontSize : function(){
-        	if ( this.m_connector != null ){
-        		var params = "size:"+this.m_fontSizeSpin.getValue();
-        		var path = skel.widgets.Path.getInstance();
-        		var cmd = this.m_id + path.SEP_COMMAND + "setFontSize";
-        		this.m_connector.sendCommand( cmd, params, function(){});
-        	}
+            var params = "size:"+this.m_fontSizeSpin.getValue();
+            var path = skel.widgets.Path.getInstance();
+            var cmd = this.m_id + path.SEP_COMMAND + "setFontSize";
+            this.m_connector.sendCommand( cmd, params, function(){});
         },
         
         /**

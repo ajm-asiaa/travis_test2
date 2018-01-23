@@ -113,7 +113,7 @@ getDefaultForSkyCS( const Carta::Lib::KnownSkyCS & skyCS )
     }
 }
 
-CCCoordinateFormatter::CCCoordinateFormatter( std::shared_ptr < casacore::CoordinateSystem > casaCS )
+CCCoordinateFormatter::CCCoordinateFormatter( std::shared_ptr < casa::CoordinateSystem > casaCS )
     :  m_displayAxes( 2, Carta::Lib::AxisInfo::KnownType::OTHER )
 {
     // remember the pointer to casa coordinate systems
@@ -127,7 +127,7 @@ CCCoordinateFormatter *
 CCCoordinateFormatter::clone() const
 {
     CCCoordinateFormatter * res = new CCCoordinateFormatter( * this );
-    res->m_casaCS.reset( new casacore::CoordinateSystem( * m_casaCS ) );
+    res->m_casaCS.reset( new casa::CoordinateSystem( * m_casaCS ) );
     return res;
 }
 
@@ -142,43 +142,22 @@ QStringList
 CCCoordinateFormatter::formatFromPixelCoordinate( const CoordinateFormatterInterface::VD & pix )
 {
     // first convert the pixel coordinates to world coordinates
-    casacore::Vector < casacore::Double > world;
-    casacore::Vector < casacore::Double > pixel = pix;
+    casa::Vector < casa::Double > world;
+    casa::Vector < casa::Double > pixel = pix;
     m_casaCS->toWorld( world, pix );
-
-    // for spectral axis
-    // convert freq to radio velocity
-    int NumberofSpectralAxis = -1;
-    casacore::Quantum<casacore::Double> velocity;
-    if(m_casaCS->hasSpectralAxis())
-    {
-        NumberofSpectralAxis = m_casaCS->spectralAxisNumber();
-        casacore::SpectralCoordinate casaSpeSystem = m_casaCS->spectralCoordinate();
-        casaSpeSystem.pixelToVelocity(velocity,pixel(NumberofSpectralAxis));
-    }
-
 
     // format each axis
 //    QStringList list;
 //    for (unsigned int i = 0; i < m_casaCS->nCoordinates(); i++) {
-//        casacore::String units;
-//        casacore::String s = m_casaCS->format(units, casacore::Coordinate::FIXED, world[i], i);
+//        casa::String units;
+//        casa::String s = m_casaCS->format(units, casa::Coordinate::FIXED, world[i], i);
 //        list.append(QString("%1%2").arg(s.c_str()).arg(units.c_str()));
 //    }
 //    return list;
 
     QStringList list;
     for ( int i = 0 ; i < nAxes() ; i++ ) {
-        QString val = formatWorldValue( i, world[i] );
-        if(NumberofSpectralAxis == i &&
-           NumberofSpectralAxis != -1)
-        {
-            val += " VRAD:";
-            val +=  QString::number(casacore::Double(velocity.getValue()));
-            val +=  " ";
-            val +=  velocity.getUnit().c_str();
-        }
-        list.append( val );
+        list.append( formatWorldValue( i, world[i] ) );
     }
     return list;
 } // formatFromPixelCoordinate
@@ -212,19 +191,18 @@ bool
 CCCoordinateFormatter::toWorld( const CoordinateFormatterInterface::VD & pixel,
                                 CoordinateFormatterInterface::VD & world ) const
 {
-    casacore::Vector< casacore::Double > worldD = world;
-    casacore::Vector< casacore::Double > pixelD = pixel;
-    bool valid = m_casaCS->toWorld( worldD, pixelD );
-    world = {worldD[0], worldD[1] };
-    return valid;
+    Q_UNUSED( pixel );
+    Q_UNUSED( world );
+
+    qFatal( "not implemented" );
 }
 
 bool
 CCCoordinateFormatter::toPixel( const CoordinateFormatterInterface::VD & world,
                                 CoordinateFormatterInterface::VD & pixel ) const
 {
-    casacore::Vector < casacore::Double > worldD = world;
-    casacore::Vector < casacore::Double > pixelD = pixel;
+    casa::Vector < casa::Double > worldD = world;
+    casa::Vector < casa::Double > pixelD = pixel;
     bool valid = m_casaCS->toPixel( pixelD, worldD );
     pixel = { pixelD[0], pixelD[1] };
     return valid;
@@ -264,23 +242,23 @@ CCCoordinateFormatter::skyCS()
         return KnownSkyCS::Unknown;
     }
     int which = m_casaCS->directionCoordinateNumber();
-    const casacore::DirectionCoordinate & dirCoord = m_casaCS->directionCoordinate( which );
-    casacore::MDirection::Types dirType = dirCoord.directionType( true );
+    const casa::DirectionCoordinate & dirCoord = m_casaCS->directionCoordinate( which );
+    casa::MDirection::Types dirType = dirCoord.directionType( true );
     switch ( dirType )
     {
-    case casacore::MDirection::Types::B1950 :
+    case casa::MDirection::Types::B1950 :
         return KnownSkyCS::B1950;
 
-    case casacore::MDirection::Types::J2000 :
+    case casa::MDirection::Types::J2000 :
         return KnownSkyCS::J2000;
 
-    case casacore::MDirection::Types::ICRS :
+    case casa::MDirection::Types::ICRS :
         return KnownSkyCS::ICRS;
 
-    case casacore::MDirection::Types::GALACTIC :
+    case casa::MDirection::Types::GALACTIC :
         return KnownSkyCS::Galactic;
 
-    case casacore::MDirection::Types::ECLIPTIC :
+    case casa::MDirection::Types::ECLIPTIC :
         return KnownSkyCS::Ecliptic;
 
     default :
@@ -312,31 +290,29 @@ CCCoordinateFormatter::setSkyCS( const KnownSkyCS & scs )
     CARTA_ASSERT( 0 <= pixelAxes[1] && pixelAxes[1] < nAxes() );
 
     // make a copy of it
-    casacore::DirectionCoordinate dirCoordCopy =
-        casacore::DirectionCoordinate( m_casaCS->directionCoordinate( which ) );
+    casa::DirectionCoordinate dirCoordCopy =
+        casa::DirectionCoordinate( m_casaCS->directionCoordinate( which ) );
 
     // change the system in the copy
-    casacore::MDirection::Types mdir;
+    casa::MDirection::Types mdir;
     switch ( scs )
     {
     case KnownSkyCS::B1950 :
-        mdir = casacore::MDirection::B1950;
+        mdir = casa::MDirection::B1950;
         break;
     case KnownSkyCS::J2000 :
-        mdir = casacore::MDirection::J2000;
+        mdir = casa::MDirection::J2000;
         break;
     case KnownSkyCS::ICRS :
-        mdir = casacore::MDirection::ICRS;
+        mdir = casa::MDirection::ICRS;
         break;
     case KnownSkyCS::Ecliptic :
-        mdir = casacore::MDirection::ECLIPTIC;
+        mdir = casa::MDirection::ECLIPTIC;
         break;
     case KnownSkyCS::Galactic :
-        mdir = casacore::MDirection::GALACTIC;
+        mdir = casa::MDirection::GALACTIC;
         break;
     default :
-        // meanless initilization, only for sliencing warning
-        mdir = casacore::MDirection::DEFAULT;
         CARTA_ASSERT_ALWAYS_X( false, "Internal error" );
         break;
     } // switch
@@ -422,8 +398,8 @@ CCCoordinateFormatter::parseCasaCSi( int pixelAxis )
 
     //qDebug() << pixelAxis << "-->" << coord << "," << coord2;
     //qDebug() << "   "
-    //         << casacore::Coordinate::typeToString( m_casaCS->coordinate( coord ).type() ).c_str();
-
+    //         << casa::Coordinate::typeToString( m_casaCS->coordinate( coord ).type() ).c_str();
+    
     AxisInfo & aInfo = m_axisInfos[pixelAxis];
 
     // default will be unknown axis
@@ -437,21 +413,8 @@ CCCoordinateFormatter::parseCasaCSi( int pixelAxis )
         const auto & cc = m_casaCS->coordinate( coord );
         auto skycs = skyCS();
 
-        // Directly save the label from casa
-        QString rawAxisLabel = cc.worldAxisNames() ( coord2 ).c_str();
-        QString longLabel = rawAxisLabel.toLower();
-        // Transform each first character to uppercase.
-        if ( rawAxisLabel != "" ){
-            QStringList longLabelSplit = longLabel.split(" ");
-            for( int i=0; i<longLabelSplit.length(); i++){
-                longLabelSplit[i].replace(0, 1, longLabelSplit[i].at(0).toUpper());
-            }
-            longLabel = longLabelSplit.join(" ");
-        }
-        aInfo.setLongLabel( HtmlString::fromPlain( longLabel ) );
-
         // we handle sky coordinate
-        if ( cc.type() == casacore::Coordinate::DIRECTION ) {
+        if ( cc.type() == casa::Coordinate::DIRECTION ) {
             // is it longitude?
             if ( coord2 == 0 ) {
                 aInfo.setKnownType( AxisInfo::KnownType::DIRECTION_LON );
@@ -460,21 +423,18 @@ CCCoordinateFormatter::parseCasaCSi( int pixelAxis )
                 if ( skycs == KnownSkyCS::B1950 ||
                      skycs == KnownSkyCS::J2000 ||
                      skycs == KnownSkyCS::ICRS ) {
-                    aInfo.setShortLabel( HtmlString( "RA", "&alpha;" ) );
-                    //precision to 0.001 arcsec
-                    m_precisions[pixelAxis] = 5;
+                    aInfo.setLongLabel( HtmlString::fromPlain( "Right ascension" ) )
+                        .setShortLabel( HtmlString( "RA", "&alpha;" ) );
                 }
                 else if ( skycs == KnownSkyCS::Ecliptic ) {
-                    aInfo.setShortLabel( HtmlString( "ELon", "&lambda;"));
+                    aInfo.setLongLabel( HtmlString::fromPlain( "Ecliptic longitude" ) )
                         //.setShortLabel( HtmlString( "ELon", "l" ) );
-                    //precision to 0.001 arcsec
-                    m_precisions[pixelAxis] = 7;
+                        .setShortLabel( HtmlString( "ELon", "&lambda;"));
                 }
                 else if ( skycs == KnownSkyCS::Galactic ) {
-                    aInfo.setShortLabel( HtmlString( "GLon", "l"));
+                    aInfo.setLongLabel( HtmlString::fromPlain( "Galactic longitude" ) )
                         //.setShortLabel( HtmlString( "GLon", "&lambda;" ) );
-                    //precision to 0.001 arcsec
-                    m_precisions[pixelAxis] = 7;
+                        .setShortLabel( HtmlString( "GLon", "l"));
                 }
                 else {
                     CARTA_ASSERT( false );
@@ -488,56 +448,54 @@ CCCoordinateFormatter::parseCasaCSi( int pixelAxis )
                 if ( skycs == KnownSkyCS::B1950 ||
                      skycs == KnownSkyCS::J2000 ||
                      skycs == KnownSkyCS::ICRS ) {
-                    aInfo.setShortLabel( HtmlString( "Dec", "&delta;" ) );
-                    //precision to 0.001 arcsec
-                    m_precisions[pixelAxis] = 4;
+                    aInfo.setLongLabel( HtmlString::fromPlain( "Declination" ) )
+                        .setShortLabel( HtmlString( "Dec", "&delta;" ) );
                 }
                 else if ( skycs == KnownSkyCS::Ecliptic ) {
-                    aInfo.setShortLabel( HtmlString( "Elat", "&beta;"));
+                    aInfo.setLongLabel( HtmlString::fromPlain( "Ecliptic latitude" ) )
                         //.setShortLabel( HtmlString( "ELat", "b" ) );
-                    //precision to 0.001 arcsec
-                    m_precisions[pixelAxis] = 7;
+                        .setShortLabel( HtmlString( "Elat", "&beta;"));
                 }
                 else if ( skycs == KnownSkyCS::Galactic ) {
-                    aInfo.setShortLabel( HtmlString( "GLat", "b"));
+                    aInfo.setLongLabel( HtmlString::fromPlain( "Galactic latitude" ) )
                         //.setShortLabel( HtmlString( "GLat", "&beta;" ) );
-                    //precision to 0.001 arcsec
-                    m_precisions[pixelAxis] = 7;
+                        .setShortLabel( HtmlString( "GLat", "b"));
                 }
                 else {
                     CARTA_ASSERT( false );
                 }
             }
+            m_precisions[pixelAxis] = 3;
         }
-        else if ( cc.type() == casacore::Coordinate::SPECTRAL ) {
+        else if ( cc.type() == casa::Coordinate::SPECTRAL ) {
             aInfo.setKnownType( AxisInfo::KnownType::SPECTRAL )
-                .setLongLabel( HtmlString::fromPlain("Radio Velocity") )
-                //.setShortLabel( HtmlString::fromPlain( longLabel ));
-                .setShortLabel( HtmlString( "Vrad", "Vrad") );
-                //.setShortLabel( HtmlString( "Freq", "Freq" ) );
-            m_precisions[pixelAxis] = 9;
+                .setLongLabel( HtmlString::fromPlain( "Frequency" ) )
+                .setShortLabel( HtmlString( "Freq", "Freq" ) );
+            m_precisions[pixelAxis] = 6;
         }
-        else if ( cc.type() == casacore::Coordinate::STOKES ) {
+        else if ( cc.type() == casa::Coordinate::STOKES ) {
             aInfo.setKnownType( AxisInfo::KnownType::STOKES )
+                .setLongLabel( HtmlString::fromPlain( "Stokes" ) )
                 .setShortLabel( HtmlString::fromPlain( "Stokes" ) );
         }
-        else if ( cc.type() == casacore::Coordinate::TABULAR ) {
+        else if ( cc.type() == casa::Coordinate::TABULAR ) {
             aInfo.setKnownType( AxisInfo::KnownType::TABULAR );
 
-            //            else if ( cc.type() == casacore::Coordinate::QUALITY ) {
+            //            else if ( cc.type() == casa::Coordinate::QUALITY ) {
             //                aInfo.setKnownType( aInfo.KnownType::QUALITY);
             //            }
         }
-        else if ( cc.type() == casacore::Coordinate::LINEAR ){
+        else if ( cc.type() == casa::Coordinate::LINEAR ){
             aInfo.setKnownType( AxisInfo::KnownType::LINEAR )
-                .setShortLabel( HtmlString::fromPlain( rawAxisLabel.toLower() ) );
+                .setLongLabel( HtmlString::fromPlain( "Linear"))
+                .setShortLabel( HtmlString::fromPlain( "Linear"));
         }
         else {
             // other types... we copy whatever casacore dishes out
             aInfo.setKnownType( AxisInfo::KnownType::OTHER );
-            // QString rawAxisLabel = cc.worldAxisNames() ( coord2 ).c_str();
+            QString rawAxisLabel = cc.worldAxisNames() ( coord2 ).c_str();
             QString shortLabel = rawAxisLabel;
-            // aInfo.setLongLabel( HtmlString::fromPlain( rawAxisLabel ) );
+            aInfo.setLongLabel( HtmlString::fromPlain( rawAxisLabel ) );
             aInfo.setShortLabel( HtmlString::fromPlain( shortLabel ) );
         }
         CARTA_ASSERT( cc.worldAxisNames().size() > 0 );
@@ -601,7 +559,7 @@ CCCoordinateFormatter::formatWorldValue( int whichAxis, double worldValue )
 
     // for stokes we convert to a string using casacore's Stokes class
     else if ( ai.knownType() == AxisInfo::KnownType::STOKES ) {
-        return casacore::Stokes::name( static_cast < casacore::Stokes::StokesTypes > ( round( worldValue ) ) )
+        return casa::Stokes::name( static_cast < casa::Stokes::StokesTypes > ( round( worldValue ) ) )
                    .c_str();
     }
     else if ( ai.knownType() == AxisInfo::KnownType::SPECTRAL ){

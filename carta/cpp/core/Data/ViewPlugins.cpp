@@ -3,8 +3,6 @@
 #include "PluginManager.h"
 #include "Animator/Animator.h"
 #include "Image/Controller.h"
-#include "Image/ImageContext.h"
-#include "Image/ImageZoom.h"
 #include "Statistics/Statistics.h"
 #include "Histogram/Histogram.h"
 #include "Colormap/Colormap.h"
@@ -72,23 +70,19 @@ void ViewPlugins::_initializeDefaultState(){
         _insertPlugin( ind, entry.json.name, entry.json.description, entry.json.typeString, entry.json.version, entry.errors.join("|"));
         ind ++;
     }*/
-    m_state.insertArray( PLUGINS, 8 );
+    m_state.insertArray( PLUGINS, 6 );
     int ind = 0;
-    _insertPlugin( ind, Controller::PLUGIN_NAME, "Image Display", "", "", "");
+    _insertPlugin( ind, Controller::PLUGIN_NAME, "Image display", "", "", "");
     ind++;
     _insertPlugin( ind, Animator::CLASS_NAME, "Animation of data sets", "", "", "");
     ind++;
-    _insertPlugin( ind, Statistics::CLASS_NAME, "Statistics", "", "", "");
+    _insertPlugin( ind, Statistics::CLASS_NAME, "Image statistics", "", "", "");
     ind++;
     _insertPlugin( ind, Histogram::CLASS_NAME, "Histogram", "", "", "");
     ind++;
-    _insertPlugin( ind, Colormap::CLASS_NAME, "Color Map", "", "", "");
+    _insertPlugin( ind, Colormap::CLASS_NAME, "Color map", "", "", "");
     ind++;
-    _insertPlugin( ind, Profiler::CLASS_NAME, "Profile", "", "", "");
-    ind++;
-    _insertPlugin( ind, ImageContext::CLASS_NAME, "Image Context", "", "", "");
-    ind++;
-    _insertPlugin( ind, ImageZoom::CLASS_NAME, "Image Zoom", "", "", "");
+    _insertPlugin( ind, Profiler::CLASS_NAME, "Profiler", "", "", "");
     ind++;
     m_state.insertValue<int>( STAMP, ind);
     m_state.flushState();

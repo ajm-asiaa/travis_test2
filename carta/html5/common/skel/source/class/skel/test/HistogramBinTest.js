@@ -24,8 +24,9 @@ qx.Class.define("skel.test.HistogramBinTest", {
          */
         testTextToSlider : function() {
             this.m_binWidget.setBinCount( 35);
-            var textValue = this.m_binWidget.m_binCountTextSlider.getValue();
-            this.assertEquals( textValue, 35);
+            var textValue = this.m_binWidget.m_binCountText.getValue();
+            this.assertEquals( this.m_binWidget.m_binCountText.getValue(), 35);
+            this.assertEquals( this.m_binWidget.m_binCountSlider.getValue(), 35);
         },
         
 

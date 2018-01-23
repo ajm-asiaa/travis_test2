@@ -2,7 +2,6 @@ import unittest
 import selectBrowser
 import Util
 import time
-import tAnimator
 from selenium import webdriver
 from flaky import flaky
 from selenium.webdriver.common.keys import Keys
@@ -13,7 +12,7 @@ from selenium.webdriver.common.by import By
 
 # Tests of Animator link functionality
 @flaky(max_runs=3)
-class tAnimatorLinks(tAnimator.tAnimator):
+class tAnimatorLinks(unittest.TestCase):
 
     def setUp(self):
         browser = selectBrowser._getBrowser()
@@ -88,19 +87,16 @@ class tAnimatorLinks(tAnimator.tAnimator):
         #animator will appear
         imageWindow = WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.XPATH, "//div[@qxclass='skel.widgets.Window.DisplayWindowImage']")))
         Util.load_image( self, driver, "Default")
-        time.sleep(2)
 
-        # Enable the animation window by a context click
-        # Note, clicking on the animation window is not working because the center of the
-        # animation window is the stop button, and clicking that does not select the window.
+        # Enable the animation window
         animWindow = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "//div[@qxclass='skel.widgets.Window.DisplayWindowAnimation']")))
-        ActionChains(driver).context_click( animWindow ).perform()
+        ActionChains(driver).click( animWindow ).perform()
 
         # Remove Animator link to the image window
         linkMenuButton = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "//div[@qxclass='qx.ui.toolbar.MenuButton']/div[text()='Links...']")))
         ActionChains(driver).click( linkMenuButton ).perform()
         Util.remove_main_link( self, driver, imageWindow)
-    
+
         # Load an image in a different window
         imageWindow2 = Util.load_image_different_window( self, driver, "Orion.methanol.cbc.contsub.image.fits")
 
@@ -123,7 +119,6 @@ class tAnimatorLinks(tAnimator.tAnimator):
 
         # Show the image animator by loading a second image in the second window
         Util.load_image_windowIndex( self, driver, "aH.fits", 2)
-        time.sleep(2)
 
         # Find and click the upper spin box
         imageUpperBoundText = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "//div[@id='ImageUpperBoundSpin']/input")))
@@ -166,15 +161,13 @@ class tAnimatorLinks(tAnimator.tAnimator):
     # Test that we can add an Animator link to an image
     def test_animatorAddLink(self):
         driver = self.driver
-        timeout = selectBrowser._getSleep()
+        timeout = 2*selectBrowser._getSleep()
         browser = selectBrowser._getBrowser()
-        time.sleep(2)
 
         # Load image in a separate window, but make sure it has at least
         # one channel.
         imageWindow2 = Util.load_image_different_window( self, driver, "TWHydra_CO2_1line.image.fits")
-        time.sleep(2)
-        
+
         # Make sure the animation window is enabled by clicking an element within the window
         animWindow = driver.find_element_by_xpath( "//div[@qxclass='skel.widgets.Window.DisplayWindowAnimation']" )
         ActionChains(driver).click( animWindow ).perform()

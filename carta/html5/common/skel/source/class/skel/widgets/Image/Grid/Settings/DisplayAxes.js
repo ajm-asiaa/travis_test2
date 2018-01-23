@@ -1,6 +1,10 @@
 /**
  * Displays controls for data such as which axes of an image should be displayed.
  */
+/*global mImport */
+/*******************************************************************************
+ * @ignore( mImport)
+ ******************************************************************************/
 
 qx.Class.define("skel.widgets.Image.Grid.Settings.DisplayAxes", { 
     extend : qx.ui.core.Widget,
@@ -10,6 +14,7 @@ qx.Class.define("skel.widgets.Image.Grid.Settings.DisplayAxes", {
      */
     construct : function(  ) {
         this.base(arguments);
+        this.m_connector = mImport("connector");
         this._init();
     },
 
@@ -105,6 +110,8 @@ qx.Class.define("skel.widgets.Image.Grid.Settings.DisplayAxes", {
         },
         
         m_id : null,
+        m_connector : null,
+        m_sharedVar : null,
         
         m_axisXCombo : null,
         m_axisYCombo : null

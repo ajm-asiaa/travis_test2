@@ -1,5 +1,5 @@
 #include "Histogram.h"
-#include "Render/HistogramRenderService.h"
+#include "HistogramRenderService.h"
 #include "Data/Clips.h"
 #include "Data/Colormap/Colormap.h"
 #include "ChannelUnits.h"
@@ -11,11 +11,8 @@
 #include "Data/Util.h"
 #include "Data/Plotter/Plot2DManager.h"
 #include "Plot2D/Plot2DGenerator.h"
-#include "Data/Histogram/BinData.h"
 #include "Data/Histogram/PlotStyles.h"
 #include "Data/Preferences/PreferencesSave.h"
-#include "Data/Region/RegionControls.h"
-#include "Data/Region/Region.h"
 #include "Globals.h"
 #include "MainConfig.h"
 #include "PluginManager.h"
@@ -23,7 +20,6 @@
 #include "CartaLib/Hooks/Histogram.h"
 #include "CartaLib/AxisInfo.h"
 #include "CartaLib/PixelPipeline/IPixelPipeline.h"
-#include "CartaLib/Regions/IRegion.h"
 #include "State/UtilState.h"
 #include <set>
 #include <QtCore/qmath.h>
@@ -76,8 +72,6 @@ const QString Histogram::RESTRICT_SIZE_MAX = "cubeSizeMax";
 Clips*  Histogram::m_clips = nullptr;
 PlotStyles* Histogram::m_graphStyles = nullptr;
 ChannelUnits* Histogram::m_channelUnits = nullptr;
-QList<QColor> Histogram::m_curveColors = {Qt::blue, Qt::green, Qt::black, Qt::cyan,
-        Qt::magenta, Qt::yellow, Qt::gray };
 
 class Histogram::Factory : public Carta::State::CartaObjectFactory {
 public:
@@ -111,9 +105,8 @@ Histogram::Histogram( const QString& path, const QString& id):
             SIGNAL(histogramResult(const Carta::Lib::Hooks::HistogramResult& )),
             this,
             SLOT(_histogramRendered(const Carta::Lib::Hooks::HistogramResult& )));
-    Plot2DGenerator* gen = new Plot2DGenerator();
-    gen->setHistogram( true, 0 );
-    m_plotManager->setPlotGenerator( gen );
+
+    m_plotManager->setPlotGenerator( new Plot2DGenerator( Plot2DGenerator::PlotType::HISTOGRAM) );
     m_plotManager->setTitleAxisY( "Count(pixels)" );
     m_plotManager->setTitleAxisX( "Intensity" );
     connect( m_plotManager.get(), SIGNAL(userSelection()), this, SLOT(_zoomToSelection()));
@@ -126,6 +119,7 @@ Histogram::Histogram( const QString& path, const QString& id):
 
     m_controllerLinked = false;
     m_cubeChannel = 0;
+
 
     //Load the available clips.
     if ( m_clips == nullptr ){
@@ -143,14 +137,11 @@ QString Histogram::addLink( CartaObject*  target){
         if ( !m_controllerLinked ){
             linkAdded = m_linkImpl->addLink( controller );
             if ( linkAdded ){
-                connect(controller, SIGNAL(dataChanged(Controller*)),
-                		this, SLOT(_createHistogram(Controller*)));
-                connect(controller, SIGNAL(dataChangedRegion(Controller*)),
-                               		this, SLOT(_createHistogram(Controller*)));
+                connect(controller, SIGNAL(dataChanged(Controller*)), this , SLOT(_createHistogram(Controller*)));
                 connect( controller,SIGNAL(frameChanged(Controller*, Carta::Lib::AxisInfo::KnownType)),
                         this, SLOT(_updateChannel(Controller*, Carta::Lib::AxisInfo::KnownType)));
-                connect(controller, SIGNAL(clipsChanged(double,double,bool)),
-                        this, SLOT(_updateColorClips(double,double,bool)));
+                connect(controller, SIGNAL(clipsChanged(double,double)),
+                        this, SLOT(_updateColorClips(double,double)));
                 m_controllerLinked = true;
                 _createHistogram( controller );
             }
@@ -171,38 +162,6 @@ QString Histogram::addLink( CartaObject*  target){
     return result;
 }
 
-void Histogram::_assignColor( std::shared_ptr<BinData> binData ){
-    //First go through list of fixed colors & see if there is one available.
-    int fixedColorCount = m_curveColors.size();
-    int curveCount = m_binDatas.size();
-    bool colorAssigned = false;
-    for ( int i = 0; i < fixedColorCount; i++ ){
-        bool colorAvailable = true;
-        QString fixedColorName = m_curveColors[i].name();
-        for ( int j = 0; j < curveCount; j++ ){
-            if ( m_binDatas[j]->getColor().name() == fixedColorName ){
-                colorAvailable = false;
-                break;
-            }
-        }
-        if ( colorAvailable ){
-            binData->setColor( m_curveColors[i] );
-            colorAssigned = true;
-            break;
-        }
-    }
-
-    //If there is no color in the fixed list, assign a random one.
-    if ( !colorAssigned ){
-        const int MAX_COLOR = 255;
-        int redAmount = qrand() % MAX_COLOR;
-        int greenAmount = qrand() % MAX_COLOR;
-        int blueAmount = qrand() % MAX_COLOR;
-        QColor randomColor( redAmount, greenAmount, blueAmount );
-        binData->setColor( randomColor.name());
-    }
-}
-
 void Histogram::applyClips(){
    //Get percentiles and normalize to [0,1].
    double clipMinPercent = m_stateData.getValue<double>( COLOR_MIN_PERCENT );
@@ -218,9 +177,9 @@ void Histogram::applyClips(){
                controller->applyClips( minPercentile, maxPercentile );
            }
        }
-       //double colorMin = m_stateData.getValue<double>( COLOR_MIN );
-       //double colorMax = m_stateData.getValue<double>( COLOR_MAX );
-       //emit colorIntensityBoundsChanged( colorMin, colorMax, false );
+       double colorMin = m_stateData.getValue<double>( COLOR_MIN );
+       double colorMax = m_stateData.getValue<double>( COLOR_MAX );
+       emit colorIntensityBoundsChanged( colorMin, colorMax );
    }
 }
 
@@ -231,12 +190,19 @@ void Histogram::clear(){
 
 
 void Histogram::_createHistogram( Controller* controller){
+
+    double minIntensity = 0;
+    double maxIntensity = 0;
     std::pair<int,int> frameBounds = _getFrameBounds();
-    std::vector<double> intensities = controller->getIntensity( frameBounds.first, frameBounds.second, {0, 1} );
-    if( intensities.size() == 2){
+    int index = 0;
+    bool minValid = controller->getIntensity( frameBounds.first, frameBounds.second,
+            0, &minIntensity, &index );
+    bool maxValid = controller->getIntensity( frameBounds.first, frameBounds.second,
+            1, &maxIntensity, &index );
+    if(minValid && maxValid){
         int significantDigits = m_state.getValue<int>(Util::SIGNIFICANT_DIGITS);
-        double minIntensity = Util::roundToDigits( intensities[0], significantDigits );
-        double maxIntensity = Util::roundToDigits( intensities[1], significantDigits );
+        minIntensity = Util::roundToDigits( minIntensity, significantDigits );
+        maxIntensity = Util::roundToDigits( maxIntensity, significantDigits );
         m_stateData.setValue<double>(CLIP_MIN_PERCENT, 0 );
         m_stateData.setValue<double>(CLIP_MAX_PERCENT, 100 );
         m_stateData.setValue<double>(CLIP_MIN, minIntensity);
@@ -265,8 +231,7 @@ void Histogram::_createHistogram( Controller* controller){
 
         double colorMinPercent = controller->getClipPercentileMin();
         double colorMaxPercent = controller->getClipPercentileMax();
-        bool autoClip = controller->getAutoClip();
-        _updateColorClips( colorMinPercent, colorMaxPercent, autoClip );
+        _updateColorClips( colorMinPercent, colorMaxPercent );
 
 
         m_stateData.flushState();
@@ -341,13 +306,13 @@ double Histogram::_getBufferedIntensity( const QString& clipKey, const QString& 
             float percentile = actual / 100;
             Controller* controller = _getControllerSelected();
             if ( controller != nullptr ){
+                double actualIntensity = intensity;
                 std::pair<int,int> frameBounds = _getFrameBounds();
-                std::vector<double> percentiles(1);
-                percentiles[0] = percentile;
-                std::vector<double> intensities = controller->getIntensity(
-                        frameBounds.first, frameBounds.second, { percentile } );
-                if ( intensities.size() == 1 ){
-                    intensity = intensities[0];
+                int index = 0;
+                bool intensityValid = controller->getIntensity( frameBounds.first,
+                        frameBounds.second, percentile, &actualIntensity, &index );
+                if ( intensityValid ){
+                    intensity = actualIntensity;
                 }
             }
         }
@@ -355,14 +320,7 @@ double Histogram::_getBufferedIntensity( const QString& clipKey, const QString& 
     return intensity;
 }
 
-std::pair<double, double> Histogram::getClipRange() const {
-    double clipMin = m_stateData.getValue<double>(CLIP_MIN);
-    double clipMax = m_stateData.getValue<double>(CLIP_MAX);
-    std::pair<double, double> clipRangeValues(clipMin, clipMax);
-    return clipRangeValues;
-}
-
-bool Histogram::getColored() const {
+bool Histogram::getColored(){
     bool colored = m_state.getValue<bool>(GRAPH_COLORED);
     return colored;
 }
@@ -394,15 +352,11 @@ std::pair<int,int> Histogram::_getFrameBounds() const {
     return bounds;
 }
 
-QString Histogram::getFootPrint2D() const {
-	return m_state.getValue<QString>( FOOT_PRINT );
-}
-
 QList<QString> Histogram::getLinks() const {
     return m_linkImpl->getLinkIds();
 }
 
-bool Histogram::getLogCount() const {
+bool Histogram::getLogCount(){
     bool logCount = m_state.getValue<bool>(GRAPH_LOG_COUNT);
     return logCount;
 }
@@ -442,41 +396,25 @@ bool Histogram::getUseClipBuffer(){
 }
 
 void Histogram::_histogramRendered(const Carta::Lib::Hooks::HistogramResult& result){
-	QString resultName = result.getName();
-	if ( resultName.startsWith( Util::ERROR)){
-		ErrorManager* hr = Util::findSingletonObject<ErrorManager>();
-		hr->registerError( resultName );
-	}
-	else {
-		//Only create a new one if there is not an existing one that
-		//matches.
-		int targetIndex = -1;
-		int dataCount = m_binDatas.size();
-		for ( int i = 0; i < dataCount; i++ ){
-			if ( m_binDatas[i]->getName() == resultName ){
-				targetIndex = i;
-				break;
-			}
-		}
-		//Add the result to our list of plots.
-		if ( targetIndex == -1 ){
-			Carta::State::ObjectManager* objMan = Carta::State::ObjectManager::objectManager();
-			CartaObject* binObj = objMan->createObject<BinData>();
-			std::shared_ptr<BinData> binData(dynamic_cast<BinData*>(binObj));
-			_assignColor( binData );
-			binData->setName( resultName );
-			m_binDatas.append( binData );
-			targetIndex = m_binDatas.size() - 1;
-		}
-		m_binDatas[targetIndex]->setHistogramResult( result );
+    QString resultName = result.getName();
+    if ( resultName.startsWith( Util::ERROR)){
+        ErrorManager* hr = Util::findSingletonObject<ErrorManager>();
+        hr->registerError( resultName );
+    }
+    else {
+        m_plotManager->addData( &result );
+        m_plotManager->updatePlot();
+        double freqLow = result.getFrequencyMin();
+        double freqHigh = result.getFrequencyMax();
+        setPlaneRange( freqLow, freqHigh);
 
-		double freqLow = result.getFrequencyMin();
-		double freqHigh = result.getFrequencyMax();
-		setPlaneRange( freqLow, freqHigh);
-		_updatePlots();
-	}
+        //Refresh the view
+        m_plotManager->setLogScale( m_state.getValue<bool>( GRAPH_LOG_COUNT ) );
+        m_plotManager->setStyle( m_state.getValue<QString>( GRAPH_STYLE ) );
+        m_plotManager->setColored( m_state.getValue<bool>( GRAPH_COLORED ) );
+        m_plotManager->updatePlot();
+    }
 }
-
 
 
 void Histogram::_initializeDefaultState(){
@@ -506,8 +444,6 @@ void Histogram::_initializeDefaultState(){
 
     //Preferences - not image specific
     const int DEFAULT_BIN_COUNT = 25;
-    // Make the value consistent with the default setting of qwt.
-    const int DEFAULT_BIN_WIDTH = 40;
     m_state.insertValue<int>(BIN_COUNT, DEFAULT_BIN_COUNT );
     //Decide if the user has decided to override the maximum bin count.
     int histMaxBinCount = Globals::instance()->mainConfig()->getHistogramBinCountMax();
@@ -516,7 +452,8 @@ void Histogram::_initializeDefaultState(){
     }
 
     m_state.insertValue<int>(BIN_COUNT_MAX, histMaxBinCount );
-    m_state.insertValue<double>(BIN_WIDTH, DEFAULT_BIN_WIDTH );
+    double binWidth = _toBinWidth(DEFAULT_BIN_COUNT);
+    m_state.insertValue<double>(BIN_WIDTH, binWidth );
     m_state.insertValue<bool>(CLIP_APPLY, false );
     m_state.insertValue<bool>(CLIP_BUFFER, false);
     QString defaultStyle = m_graphStyles->getDefault();
@@ -525,7 +462,7 @@ void Histogram::_initializeDefaultState(){
     m_state.insertValue<bool>(GRAPH_COLORED, false );
     m_state.insertValue<QString>(PLANE_MODE, PLANE_MODE_ALL );
     m_state.insertValue<QString>(FREQUENCY_UNIT, m_channelUnits->getDefaultUnit());
-    m_state.insertValue<bool>(SIZE_ALL_RESTRICT, false );
+    m_state.insertValue<bool>(SIZE_ALL_RESTRICT, true );
     m_state.insertValue<int>(RESTRICT_SIZE_MAX, 1000000 );
     m_state.insertValue<QString>(FOOT_PRINT, FOOT_PRINT_IMAGE );
     m_state.insertValue<int>(Util::SIGNIFICANT_DIGITS, 6 );
@@ -554,7 +491,7 @@ void Histogram::_initializeCallbacks(){
             double logMaxCount = qLn( maxBinCount ) / qLn(10);
             double percentage  = (binCount*1.0) / maxBinCount;
             double percentLogMax = percentage * logMaxCount;
-            int scaledBinCount = round( qPow(10, percentLogMax) );
+            int scaledBinCount = static_cast<int>( qPow(10, percentLogMax) );
             result = setBinCount( scaledBinCount );
         }
         else {
@@ -1028,7 +965,7 @@ void Histogram::_loadData( Controller* controller ){
         return;
     }
 
-    int binCount = m_state.getValue<int>(BIN_COUNT);
+    int binCount = m_state.getValue<int>(BIN_COUNT)+1;
     double minFrequency = -1;
     double maxFrequency = -1;
     QString rangeUnits = m_state.getValue<QString>(FREQUENCY_UNIT );
@@ -1040,18 +977,6 @@ void Histogram::_loadData( Controller* controller ){
     std::shared_ptr<DataSource> dataSource = controller->getDataSource();
     if ( dataSource ) {
         std::shared_ptr<Carta::Lib::Image::ImageInterface> image= dataSource->_getImage();
-        std::vector<std::shared_ptr<Region> > regions;
-        QString footPrint = getFootPrint2D();
-        std::shared_ptr<RegionControls> regionControls = controller->getRegionControls();
-        if ( footPrint == FOOT_PRINT_REGION ){
-        	std::shared_ptr<Region> region = regionControls->getRegion("");
-        	if ( region ){
-        		regions.push_back( region );
-        	}
-        }
-        else if ( footPrint == FOOT_PRINT_REGION_ALL ){
-        	regions = regionControls->getRegions();
-        }
         std::vector<int> imageDims = image->dims();
         int dimCount = imageDims.size();
         int pixelSize = 1;
@@ -1079,51 +1004,13 @@ void Histogram::_loadData( Controller* controller ){
         std::shared_ptr<Carta::Lib::PixelPipeline::CustomizablePixelPipeline> pipeline = dataSource->_getPipeline();
 
         m_plotManager->setPipeline( pipeline );
-        int regionCount = regions.size();
-        QString fileName = dataSource->_getFileName();
-        std::vector<HistogramRenderRequest> requests;
-        if ( regionCount == 0 ){
-        	std::shared_ptr<Carta::Lib::Regions::RegionBase> nullRegion( nullptr );
-        	HistogramRenderRequest request( image, binCount, minChannel, maxChannel,
-        				minFrequency, maxFrequency, rangeUnits, minIntensity, maxIntensity,
-        				fileName, nullRegion, "!" );
-        	//Only make a new one if we don't already have this one stored since making a
-        	//histogram is data intensive.
-        	requests.push_back( request );
-        }
-        else {
-        	for ( int i = 0; i < regionCount; i++ ){
-        		std::shared_ptr<Carta::Lib::Regions::RegionBase> regionBase = regions[i]->getModel();
-        		QString idStr = regions[i]->getId();
-        		HistogramRenderRequest request( image, binCount, minChannel, maxChannel,
-        		        				minFrequency, maxFrequency, rangeUnits, minIntensity, maxIntensity,
-        		        				fileName, regionBase, idStr );
-        		requests.push_back( request );
-        	}
-        }
-
-        //Update the list of bin data which should be removed (no longer needed).  Only return
-        //requests that are not already stored.
-        std::vector<HistogramRenderRequest> renderRequests = _updateBinDatas( requests );
-        int renderRequestCount = renderRequests.size();
-        if ( renderRequestCount == 0 ){
-        	//Clear the plot manager and put the existing data into it.
-        	_updatePlots();
-        }
-        else {
-        	for ( int i = 0; i < renderRequestCount; i++ ){
-        		m_renderService->renderHistogram( renderRequests[i] );
-        	}
-        }
+        m_renderService->renderHistogram(image,
+                    binCount, minChannel, maxChannel, minFrequency, maxFrequency,
+                    rangeUnits, minIntensity, maxIntensity, dataSource->_getFileName());
     }
     else {
-    	int dataCount = this->m_binDatas.size();
-    	for ( int i = (dataCount - 1); i>= 0; i-- ){
-    		_removeData( i );
-    	}
-
         _resetDefaultStateData();
-        _updatePlots();
+        m_plotManager->clearData();
     }
 }
 
@@ -1203,17 +1090,6 @@ void Histogram::resetStateData( const QString& state ){
     m_stateData.flushState();
 }
 
-
-
-void Histogram::_removeData( int index ){
-	int dataCount = m_binDatas.size();
-	if ( index >= 0 && index < dataCount ){
-		Carta::State::ObjectManager* objMan = Carta::State::ObjectManager::objectManager();
-		objMan->removeObject( m_binDatas[index]->getId());
-		m_binDatas.removeAt( index );
-	}
-}
-
 QString Histogram::setClipBuffer( int bufferAmount ){
     QString result;
     if ( bufferAmount >= 0 && bufferAmount < 100 ){
@@ -1247,7 +1123,12 @@ QString Histogram::setClipRange( double clipMin, double clipMax ){
     return result;
 }
 
-
+std::pair<double, double> Histogram::getClipRange() const {
+    double clipMin = m_stateData.getValue<double>(CLIP_MIN);
+    double clipMax = m_stateData.getValue<double>(CLIP_MAX);
+    std::pair<double, double> clipRangeValues(clipMin, clipMax);
+    return clipRangeValues;
+}
 
 QString Histogram::setCubeSizeLimit(  int sizeLimit ){
     QString result;
@@ -1336,9 +1217,9 @@ QString Histogram::setClipMax( double clipMaxClient, bool finish ){
         double imageMaxIntensity = 0;
         Controller* controller = _getControllerSelected();
         if ( controller != nullptr ){
-            std::vector<double> intensities = controller->getIntensity( {1} );
-            if ( intensities.size() == 1 ){
-                imageMaxIntensity = intensities[0];
+            int index = 0;
+            double maxIntensityValid = controller->getIntensity( 1, &imageMaxIntensity, &index  );
+            if ( maxIntensityValid ){
                 if ( clipMaxClient < imageMaxIntensity ){
                     adjustedMax = imageMaxIntensity;
                 }
@@ -1354,8 +1235,10 @@ QString Histogram::setClipMax( double clipMaxClient, bool finish ){
                     Controller* controller = _getControllerSelected();
                     if ( controller != nullptr ){
                         std::pair<int,int> bounds = _getFrameBounds();
-                        double clipMaxPercent = controller->getPercentiles(bounds.first, bounds.second,
-                                {clipMaxClient} )[0];
+                        double clipUpperBound;
+                        int index;
+                        controller->getIntensity( bounds.first, bounds.second, 1, &clipUpperBound, &index );
+                        double clipMaxPercent = controller->getPercentile(bounds.first, bounds.second, clipMaxClient );
                         if ( clipMaxPercent >= 0 ){
                             clipMaxPercent = Util::roundToDigits(clipMaxPercent * 100, significantDigits);
                             if(qAbs(oldMaxPercent - clipMaxPercent) > m_errorMargin){
@@ -1405,14 +1288,17 @@ QString Histogram::setClipMin( double clipMinClient, bool finish ){
     //Bypass the check that the new min is less than the old max if we are not
     //finished and are also planning to set a new max.
     if ( clipMinClient < clipMaxClient || !finish ){
+
         //The histogram will segfault if the clip is set less than the minimum intensity, so
         //we adjust what the client wants to what the histogram will take.
         Controller* controller = _getControllerSelected();
         double adjustedMin = clipMinClient;
         if ( controller != nullptr ){
-            std::vector<double> intensities = controller->getIntensity( {0} );
-            if ( intensities.size() == 1 ){
-                double imageMinIntensity = intensities[0];
+            double imageMinIntensity = 0;
+            double minIntensityValid = false;
+            int index = 0;
+            minIntensityValid = controller->getIntensity( 0, &imageMinIntensity, &index  );
+            if ( minIntensityValid ){
                 if ( clipMinClient < imageMinIntensity ){
                     adjustedMin = imageMinIntensity;
                 }
@@ -1426,7 +1312,7 @@ QString Histogram::setClipMin( double clipMinClient, bool finish ){
                 bool validWidth = _resetBinCountBasedOnWidth();
                 if ( validWidth ){
                     std::pair<int,int> bounds = _getFrameBounds();
-                    double clipMinPercent = controller->getPercentiles( bounds.first, bounds.second, {clipMinClient})[0];
+                    double clipMinPercent = controller->getPercentile( bounds.first, bounds.second, clipMinClient);
                     clipMinPercent = Util::roundToDigits(clipMinPercent * 100, significantDigits);
                     if ( clipMinPercent >= 0 ){
                         if(qAbs(oldMinPercent - clipMinPercent) > m_errorMargin){
@@ -1475,12 +1361,13 @@ QString Histogram::setClipMinPercent( double clipMinPercent, bool complete ){
                  m_stateData.setValue<double>(CLIP_MIN_PERCENT, clipMinPercentRounded );
                  Controller* controller = _getControllerSelected();
                  if ( controller != nullptr ){
+                     double clipMin = 0;
                      double cMin = clipMinPercentRounded / 100.0;
                      std::pair<int,int> bounds = _getFrameBounds();
-                     std::vector<double> intensities = controller->getIntensity(
-                             bounds.first, bounds.second, {cMin} );
-                     if ( intensities.size() == 1){
-                         double clipMin = intensities[0];
+                     int index = 0;
+                     bool validIntensity = controller->getIntensity( bounds.first, bounds.second,
+                             cMin, &clipMin, &index );
+                     if(validIntensity){
                          double oldClipMin = m_stateData.getValue<double>(CLIP_MIN);
                          if(qAbs(oldClipMin - clipMin) > m_errorMargin){
                              bool validWidth = _resetBinCountBasedOnWidth();
@@ -1540,10 +1427,10 @@ QString Histogram::setClipMaxPercent( double clipMaxPercent, bool complete ){
                      double clipMax = 0;
                      double decPercent = lookupPercent / 100.0;
                      std::pair<int,int> bound = _getFrameBounds();
-                     std::vector<double> intensities = controller->getIntensity(
-                             bound.first, bound.second, { decPercent } );
-                     if( intensities.size() == 1 ){
-                         clipMax = intensities[0];
+                     int index = 0;
+                     bool validIntensity = controller->getIntensity(bound.first, bound.second,
+                             decPercent, &clipMax, &index );
+                     if(validIntensity){
                          double oldClipMax = m_stateData.getValue<double>(CLIP_MAX);
                          if(qAbs(oldClipMax - clipMax) > m_errorMargin){
 
@@ -1619,7 +1506,7 @@ QString Histogram::setColorMin( double colorMin, bool finish ){
             Controller* controller = _getControllerSelected();
             if ( controller != nullptr ){
                 std::pair<int,int> bounds = _getFrameBounds();
-                double colorMinPercent = controller->getPercentiles( bounds.first, bounds.second, {colorMinRounded})[0];
+                double colorMinPercent = controller->getPercentile( bounds.first, bounds.second, colorMinRounded);
                 colorMinPercent = colorMinPercent * 100;
                 if ( colorMinPercent >= 0 ){
                     if(qAbs(oldMinPercent - colorMinPercent) > m_errorMargin){
@@ -1657,12 +1544,14 @@ QString Histogram::setColorMax( double colorMax, bool finish ){
             Controller* controller = _getControllerSelected();
             if ( controller != nullptr ){
                 std::pair<int,int> bounds = _getFrameBounds();
-                double colorMaxPercent = controller->getPercentiles(bounds.first, bounds.second, {colorMaxRounded} )[0];
+                double colorUpperBound;
+                int index = 0;
+                controller->getIntensity( bounds.first, bounds.second, 1, &colorUpperBound, &index );
+                double colorMaxPercent = controller->getPercentile(bounds.first, bounds.second, colorMaxRounded );
                 if ( colorMaxPercent >= 0 ){
                     colorMaxPercent = colorMaxPercent * 100;
                     if(qAbs(oldMaxPercent - colorMaxPercent) > m_errorMargin){
-                        m_stateData.setValue<double>(COLOR_MAX_PERCENT,
-                                Util::roundToDigits(colorMaxPercent,significantDigits));
+                        m_stateData.setValue<double>(COLOR_MAX_PERCENT, Util::roundToDigits(colorMaxPercent,significantDigits));
                     }
                 }
                 else {
@@ -1693,12 +1582,13 @@ QString Histogram::setColorMaxPercent( double colorMaxPercent, bool complete ){
                  m_stateData.setValue<double>(COLOR_MAX_PERCENT, colorMaxPercentRounded );
                  Controller* controller = _getControllerSelected();
                  if ( controller != nullptr ){
+                     double colorMax = 0;
                      double decPercent = lookupPercent / 100.0;
                      std::pair<int,int> bound = _getFrameBounds();
-                     std::vector<double> intensities = controller->getIntensity( bound.first,
-                             bound.second, { decPercent } );
-                     if( intensities.size() == 1){
-                         double colorMax = intensities[0];
+                     int index = 0;
+                     bool validIntensity = controller->getIntensity(bound.first,bound.second,
+                             decPercent, &colorMax, &index);
+                     if(validIntensity){
                          double oldColorMax = m_stateData.getValue<double>(COLOR_MAX);
                          if(qAbs(oldColorMax - colorMax) > m_errorMargin){
                              double roundedMax = Util::roundToDigits(colorMax,significantDigits);
@@ -1737,12 +1627,13 @@ QString Histogram::setColorMinPercent( double colorMinPercent, bool complete ){
                  m_stateData.setValue<double>(COLOR_MIN_PERCENT, colorMinPercentRounded );
                  Controller* controller = _getControllerSelected();
                  if ( controller != nullptr ){
+                     double colorMin = 0;
                      double cMin = colorMinPercentRounded / 100.0;
                      std::pair<int,int> bounds = _getFrameBounds();
-                     std::vector<double> intensities = controller->getIntensity( bounds.first,
-                             bounds.second, {cMin} );
-                     if( intensities.size() == 1){
-                         double colorMin = intensities[0];
+                     int index = 0;
+                     bool validIntensity = controller->getIntensity( bounds.first, bounds.second,
+                             cMin, &colorMin, &index );
+                     if(validIntensity){
                          double oldColorMin = m_stateData.getValue<double>(COLOR_MIN);
                          if(qAbs(oldColorMin - colorMin) > m_errorMargin){
                              double minRounded = Util::roundToDigits(colorMin,significantDigits);
@@ -1906,7 +1797,6 @@ QString Histogram::_set2DFootPrint( const QString& params ){
         if ( footPrintStr != oldFootPrint){
             m_state.setValue<QString>(FOOT_PRINT, footPrintStr );
             m_state.flushState();
-
             _generateHistogram( nullptr );
         }
     }
@@ -1990,8 +1880,6 @@ QString Histogram::setSignificantDigits( int digits ){
 }
 
 void Histogram::_setErrorMargin(){
-    // TODO: the error margin set here is not consistent with the definition
-    // of significant digits. It should be modified later.
     int significantDigits = m_state.getValue<int>(Util::SIGNIFICANT_DIGITS );
     m_errorMargin = 1.0/qPow(10,significantDigits);
 }
@@ -2057,61 +1945,12 @@ double Histogram::_toBinWidth( int count ) const {
 int Histogram::_toBinCount( double width ) const {
     double minRange = m_stateData.getValue<double>(CLIP_MIN );
     double maxRange = m_stateData.getValue<double>(CLIP_MAX);
-    double totalRange = maxRange-minRange;
-    int count = m_state.getValue<int>(BIN_COUNT);
-    // Use proper decimal to examine the error
-    if ( width > 0 && qAbs(totalRange/count-width) > m_errorMargin*pow(10, ceil(log10(width)))){
+    int count = 0;
+    if ( width > 0 ){
         count = qCeil( qAbs( maxRange - minRange)  / width);
     }
     return count;
 }
-
-std::vector<HistogramRenderRequest> Histogram::_updateBinDatas( std::vector<HistogramRenderRequest> requests ){
-	std::vector<HistogramRenderRequest> newRequests;
-	//Go through the old histograms and add new requests that we don't already have.
-	int dataCount = m_binDatas.size();
-	int requestCount = requests.size();
-
-	for ( int i = 0; i < requestCount; i++ ){
-		QString requestId = requests[i].getId();
-		bool binFound = false;
-		for ( int j = 0; j < dataCount; j++ ){
-			QString id = m_binDatas[j]->getName();
-			if ( requestId.startsWith( id ) ){
-				binFound = true;
-				break;
-			}
-		}
-		if ( !binFound ){
-			newRequests.push_back( requests[i]);
-		}
-	}
-
-	QList<int> removeIndices;
-	//Now go through the histograms and remove those not being requested.
-	for ( int j = 0; j < dataCount; j++ ){
-		bool requested = false;
-		QString binDataId = m_binDatas[j]->getName();
-		for ( int i = 0; i < requestCount; i++ ){
-			QString requestId = requests[i].getId();
-			if ( requestId.startsWith(binDataId)){
-				requested = true;
-				break;
-			}
-		}
-		if ( !requested ){
-			removeIndices.append( j );
-		}
-	}
-
-	//Remove bin data that we don't need.
-	int removeCount = removeIndices.size();
-	for ( int i = removeCount-1; i>= 0; i-- ){
-		_removeData( removeIndices[i] );
-	}
-	return newRequests;
-}
-
 
 void Histogram::_updateChannel( Controller* controller, Carta::Lib::AxisInfo::KnownType type ){
     if ( type == Carta::Lib::AxisInfo::KnownType::SPECTRAL ){
@@ -2137,16 +1976,15 @@ void Histogram::updateColorMap(){
 }
 
 
-void Histogram::_updateColorClips(double colorMinPercent, double colorMaxPercent, bool autoClip){
+void Histogram::_updateColorClips( double colorMinPercent, double colorMaxPercent ){
     if ( colorMinPercent < colorMaxPercent ){
         double normMin = colorMinPercent * 100;
         double normMax = colorMaxPercent * 100;
         setColorMinPercent( normMin, false );
         setColorMaxPercent( normMax, false );
-        //double colorMin = m_stateData.getValue<double>(COLOR_MIN);
-        //double colorMax = m_stateData.getValue<double>(COLOR_MAX);
-        //emit colorIntensityBoundsChanged( colorMin, colorMax, autoClip );
-        qDebug() << "++++++++ [Histogram] autoClip=" << autoClip;
+        double colorMin = m_stateData.getValue<double>(COLOR_MIN);
+        double colorMax = m_stateData.getValue<double>(COLOR_MAX);
+        emit colorIntensityBoundsChanged( colorMin, colorMax );
         m_stateData.flushState();
     }
 }
@@ -2163,28 +2001,6 @@ void Histogram::_updateColorSelection(){
         }
         setRangeColor( minRange, maxRange );
     }
-}
-
-void Histogram::_updatePlots( ){
-	m_plotManager->clearData();
-	int dataCount = m_binDatas.size();
-    // The result is set by setHistogramResult()
-    // The result is computed from casacore::LatticeHistogram (in ImageHistogram.cpp)
-    // The values of bins are the middle points of each interval.
-	for ( int i = 0; i < dataCount; i++ ){
-		Carta::Lib::Hooks::HistogramResult result = m_binDatas[i]->getHistogramResult();
-		m_plotManager->addData( &result );
-		m_plotManager->setColor( m_binDatas[i]->getColor(), result.getName());
-	}
-	//Refresh the view
-	m_plotManager->setLogScale( m_state.getValue<bool>( GRAPH_LOG_COUNT ) );
-	m_plotManager->setStyle( m_state.getValue<QString>( GRAPH_STYLE ) );
-	m_plotManager->setColored( m_state.getValue<bool>( GRAPH_COLORED ) );
-	bool isColored = getColored();
-	if (isColored) {
-	    updateColorMap();
-	}
-	m_plotManager->updatePlot();
 }
 
 QString Histogram::_zoomToSelection(){

@@ -22,11 +22,9 @@
 #include <QStringList>
 #include <QFont>
 
-extern "C" {
-#include <ast.h>
-};
-
 class QImage;
+class AstFrame;
+class AstFrameSet;
 
 namespace WcsPlotterPluginNS
 {
@@ -72,6 +70,11 @@ public:
     void
     setInputRect( const QRectF & rect );
 
+    ///Sets information about how the axes should be displayed in cases where
+    ///they are permuted.
+    void
+    setAxisDisplayInfo( std::vector<Carta::Lib::AxisDisplayInfo>& perm );
+
     /// read/write access to indexed fonts
     std::vector<QFont> & fonts() { return m_qfonts; }
 
@@ -110,6 +113,7 @@ protected:
     QRectF m_orect, m_irect;
     std::vector<QPen> m_pens;
     std::vector<QFont> m_qfonts;
+    std::vector<Carta::Lib::AxisDisplayInfo> m_axisDisplayInfos;
 
     double m_densityModifier = 1.0;
 
@@ -186,5 +190,11 @@ private:
      */
     AstFrameSet* _make2dFrameCelestialExclude( AstFrameSet* frameSet );
 
+    /**
+     * Creates a display frameset by permuting the celestial axis order.
+     * @param wcsinfo - the base frameset created from the image.
+     * @return - a pointer to the 2-d display frameset, or NULL if an error occurs.
+     */
+    AstFrameSet* _make2dFrameCelestial( AstFrameSet* wcsinfo );
 };
 }

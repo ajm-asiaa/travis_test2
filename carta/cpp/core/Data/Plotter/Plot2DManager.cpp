@@ -43,28 +43,15 @@ Plot2DManager::Plot2DManager( const QString& path, const QString& id ):
 }
 
 
-void Plot2DManager::addData( const Carta::Lib::Hooks::Plot2DResult* data, int index, bool primary ){
+void Plot2DManager::addData( const Carta::Lib::Hooks::Plot2DResult* data){
     if ( m_plotGenerator ){
         std::vector< std::pair<double,double> > plotData = data->getData();
         const QString& name = data->getName();
-        m_plotGenerator->addData( plotData, name, index, primary );
+        m_plotGenerator->addData( plotData, name );
     }
 }
 
-void Plot2DManager::addLabels( const std::vector<std::tuple<double,double,QString> >& labels, int index){
-    if ( m_plotGenerator ){
-        m_plotGenerator->addLabels( labels, index );
-    }
-}
 
-int Plot2DManager::addPlot(){
-    int index = -1;
-    if ( m_plotGenerator ){
-        index = m_plotGenerator->addPlot();
-    }
-    updatePlot();
-    return index;
-}
 
 void Plot2DManager::clearData(){
     if ( m_plotGenerator ){
@@ -73,31 +60,18 @@ void Plot2DManager::clearData(){
     }
 }
 
-void Plot2DManager::clearDataFit(){
-    if ( m_plotGenerator ){
-        m_plotGenerator->clearDataFit();
-        updatePlot();
-    }
-}
 
-void Plot2DManager::clearLabels( int index ){
+void Plot2DManager::clearSelection(){
     if ( m_plotGenerator ){
-        m_plotGenerator->clearLabels( index );
-    }
-}
-
-
-void Plot2DManager::clearSelection( int index ){
-    if ( m_plotGenerator ){
-        m_plotGenerator->clearSelection(index);
+        m_plotGenerator->clearSelection();
         updatePlot();
     }
 }
 
 
-void Plot2DManager::clearSelectionColor( int index ){
+void Plot2DManager::clearSelectionColor(){
     if ( m_plotGenerator ){
-        m_plotGenerator->clearSelectionColor( index );
+        m_plotGenerator->clearSelectionColor();
         updatePlot();
     }
 }
@@ -108,7 +82,6 @@ void Plot2DManager::endSelection(const QString& params ){
     std::map<QString,QString> dataValues = Carta::State::UtilState::parseParamMap( params, keys );
     QString xstr = dataValues[Util::XCOORD];
     m_selectionEnd = xstr.toDouble();
-
     if ( m_plotGenerator ){
         m_plotGenerator->setSelectionMode( false );
     }
@@ -134,89 +107,56 @@ void Plot2DManager::endSelectionColor(const QString& params ){
 }
 
 
-QString Plot2DManager::getAxisUnitsY( int index) const {
+QString Plot2DManager::getAxisUnitsY() const {
     QString units="";
     if ( m_plotGenerator ){
-        units = m_plotGenerator->getAxisUnitsY( index );
+        units = m_plotGenerator->getAxisUnitsY();
     }
     return units;
 }
 
-QPointF Plot2DManager::getImagePoint( const QPointF& screenPoint, bool* valid, int index ) const {
-    QPointF imagePt;
-    if ( m_plotGenerator ){
-        imagePt = m_plotGenerator->getImagePoint( screenPoint, valid, index );
-    }
-    return imagePt;
-}
 
-std::pair<double,double> Plot2DManager::getPlotBoundsY( const QString& id, bool* valid, int index ) const {
+std::pair<double,double> Plot2DManager::getPlotBoundsY( const QString& id, bool* valid ) const {
     std::pair<double,double> bounds;
     if ( m_plotGenerator ){
-        bounds = m_plotGenerator ->getPlotBoundsY( id, valid, index );
+        bounds = m_plotGenerator ->getPlotBoundsY( id, valid );
     }
     return bounds;
 }
 
-QSize Plot2DManager::getPlotSize( int index ) const {
-    QSize size;
-    if ( m_plotGenerator ){
-        size = m_plotGenerator->getPlotSize( index );
-    }
-    return size;
-}
 
-QPointF Plot2DManager::getPlotUpperLeft( int index ) const {
-    QPointF pt;
-    if ( m_plotGenerator ){
-        pt = m_plotGenerator->getPlotUpperLeft( index );
-    }
-    return pt;
-}
-
-
-QString Plot2DManager::getPlotTitle( int index ) const {
+QString Plot2DManager::getPlotTitle() const {
     QString title;
     if ( m_plotGenerator ){
-        title = m_plotGenerator->getPlotTitle( index );
+        title = m_plotGenerator->getPlotTitle();
     }
     return title;
 }
 
 
-std::pair<double,double> Plot2DManager::getRange( bool* valid, int index ) const {
+std::pair<double,double> Plot2DManager::getRange( bool* valid ) const {
     std::pair<double,double> range;
     if ( m_plotGenerator ){
-        range = m_plotGenerator->getRange( valid, index  );
+        range = m_plotGenerator->getRange( valid );
     }
     return range;
 }
 
 
-std::pair<double,double> Plot2DManager::getRangeColor( bool* valid, int index ) const {
+std::pair<double,double> Plot2DManager::getRangeColor( bool* valid ) const {
     std::pair<double,double> range;
     if ( m_plotGenerator ){
-        range = m_plotGenerator->getRangeColor( valid, index );
+        range = m_plotGenerator->getRangeColor( valid );
     }
     return range;
 }
 
-QPointF Plot2DManager::getScreenPoint( const QPointF& dataPoint, bool* valid, int index ) const {
-    *valid = false;
-    QPointF screenPt;
-    if ( m_plotGenerator ){
-        *valid = true;
-        screenPt = m_plotGenerator->getScreenPoint( dataPoint, index );
-    }
-    return screenPt;
-}
 
-
-double Plot2DManager::getVLinePosition( bool* valid, int index ) const {
+double Plot2DManager::getVLinePosition( bool* valid ) const {
     *valid = false;
     double pos = 0;
     if ( m_plotGenerator ){
-        pos = m_plotGenerator->getVLinePosition( valid, index );
+        pos = m_plotGenerator->getVLinePosition( valid );
     }
     return pos;
 }
@@ -281,8 +221,12 @@ void Plot2DManager::_initializeCallbacks(){
             int mouseX = mouseList[0].toInt( &validX );
             bool validY = false;
             int mouseY = mouseList[1].toInt( &validY );
-            if ( validX && validY ){
-                updateSelection( mouseX, mouseY);
+            bool validWidth = false;
+            int width = mouseList[2].toInt( &validWidth );
+            bool validHeight = false;
+            int height = mouseList[3].toInt( &validHeight );
+            if ( validX && validY && validWidth && validHeight ){
+                updateSelection( mouseX, mouseY, width, height);
             }
         }
     });
@@ -296,16 +240,9 @@ void Plot2DManager::_refreshView(){
 }
 
 
-void Plot2DManager::removeData( const QString& dataName, int index ){
+void Plot2DManager::removeData( const QString& dataName ){
     if ( m_plotGenerator ){
-        m_plotGenerator->removeData( dataName, index );
-    }
-}
-
-void Plot2DManager::removePlot( int index ){
-    if ( m_plotGenerator ){
-        m_plotGenerator->removePlot( index );
-        updatePlot();
+        m_plotGenerator->removeData( dataName );
     }
 }
 
@@ -350,7 +287,7 @@ QString Plot2DManager::savePlot( const QString& fileName ){
 
 void Plot2DManager::setAxisXRange( double min, double max ){
     if ( m_plotGenerator ){
-        m_plotGenerator->setAxisXRange( min, max);
+        m_plotGenerator->setAxisXRange( min, max );
         updatePlot();
     }
 }
@@ -358,21 +295,17 @@ void Plot2DManager::setAxisXRange( double min, double max ){
 
 void Plot2DManager::setColor( QColor curveColor, const QString& id ){
     if ( m_plotGenerator ){
-        m_plotGenerator->setColor( curveColor, id);
+        m_plotGenerator->setColor( curveColor, id );
         updatePlot();
     }
 }
 
 
-void Plot2DManager::setColored( bool colored, const QString& id, int index ){
+void Plot2DManager::setColored( bool colored, const QString& id ){
     if ( m_plotGenerator ){
-        m_plotGenerator->setColored( colored, id, index );
+        m_plotGenerator->setColored( colored, id );
         updatePlot();
     }
-}
-
-void Plot2DManager::setCursorEnabled( bool enabled ){
-    m_cursorEnabled = enabled;
 }
 
 void Plot2DManager::setCursorText( const QString& cursorText ){
@@ -382,9 +315,9 @@ void Plot2DManager::setCursorText( const QString& cursorText ){
     }
 }
 
-void Plot2DManager::setCurveName( const QString& oldName, const QString& newName, int index ){
+void Plot2DManager::setCurveName( const QString& oldName, const QString& newName ){
     if ( m_plotGenerator ){
-        m_plotGenerator->setCurveName( oldName, newName, index );
+        m_plotGenerator->setCurveName( oldName, newName );
         _refreshView();
     }
 }
@@ -394,18 +327,6 @@ void Plot2DManager::setGridLines( bool showLines ){
     if ( m_plotGenerator ){
         m_plotGenerator->setGridLines( showLines );
         updatePlot();
-    }
-}
-
-void Plot2DManager::setHLinePosition( double position, int index ){
-    if ( m_plotGenerator ){
-        m_plotGenerator->setHLinePosition( position, index );
-    }
-}
-
-void Plot2DManager::setHLineVisible( bool visible, int index ){
-    if ( m_plotGenerator ){
-        m_plotGenerator->setHLineVisible( visible, index );
     }
 }
 
@@ -441,32 +362,25 @@ void Plot2DManager::setLegendLine( bool showLegendLine ){
 }
 
 
-void Plot2DManager::setLineStyle( const QString& style, const QString& id, int index, bool primary ){
+void Plot2DManager::setLineStyle( const QString& style, const QString& id ){
     if ( m_plotGenerator ){
-        m_plotGenerator->setLineStyle( style, id, index, primary );
+        m_plotGenerator->setLineStyle( style, id );
         updatePlot();
     }
 }
 
 
-void Plot2DManager::setLogScale( bool logScale, int index ){
+void Plot2DManager::setLogScale( bool logScale ){
     if ( m_plotGenerator ){
-        m_plotGenerator->setLogScale( logScale, index );
+        m_plotGenerator->setLogScale( logScale );
         updatePlot();
     }
 }
 
 
-void Plot2DManager::setMarkedRange( double minY, double maxY, int index ){
+void Plot2DManager::setPipeline( std::shared_ptr<Carta::Lib::PixelPipeline::CustomizablePixelPipeline> pipeline) {
     if ( m_plotGenerator ){
-        m_plotGenerator->setMarkedRange( minY, maxY, index);
-    }
-}
-
-
-void Plot2DManager::setPipeline( std::shared_ptr<Carta::Lib::PixelPipeline::CustomizablePixelPipeline> pipeline, int index) {
-    if ( m_plotGenerator ){
-        m_plotGenerator->setPipeline( pipeline, index );
+        m_plotGenerator->setPipeline( pipeline );
         updatePlot();
     }
 }
@@ -478,38 +392,31 @@ void Plot2DManager::setPlotGenerator( Carta::Plot2D::Plot2DGenerator* gen ){
 }
 
 
-void Plot2DManager::setRange( double min, double max, int index ){
+void Plot2DManager::setRange( double min, double max ){
     if ( m_plotGenerator ){
-        m_plotGenerator->setRange( min, max, index );
+        m_plotGenerator->setRange( min, max );
     }
 }
 
 
-void Plot2DManager::setRangeColor( double min, double max){
+void Plot2DManager::setRangeColor( double min, double max ){
     if ( m_plotGenerator ){
         m_plotGenerator->setRangeColor( min, max );
     }
 }
 
 
-void Plot2DManager::setRangeMarkerVisible( bool visible, int index ){
+void Plot2DManager::setStyle( const QString& styleName, const QString& id ){
     if ( m_plotGenerator ){
-        m_plotGenerator->setRangeMarkerVisible( visible, index);
-    }
-}
-
-
-void Plot2DManager::setStyle( const QString& styleName, const QString& id, int index ){
-    if ( m_plotGenerator ){
-        m_plotGenerator->setStyle( styleName, id, index );
+        m_plotGenerator->setStyle( styleName, id );
         updatePlot();
     }
 }
 
 
-void Plot2DManager::setTitleAxisX( const QString& title){
+void Plot2DManager::setTitleAxisX( const QString& title ){
     if ( m_plotGenerator ){
-        m_plotGenerator->setTitleAxisX( title);
+        m_plotGenerator->setTitleAxisX( title );
         updatePlot();
     }
 }
@@ -523,20 +430,12 @@ void Plot2DManager::setTitleAxisY( const QString& title ){
 }
 
 
-void Plot2DManager::setVLinePosition( double xPos){
+void Plot2DManager::setVLinePosition( double xPos ){
     if ( m_plotGenerator ){
         m_plotGenerator->setMarkerLine( xPos );
         updatePlot();
     }
 }
-
-void Plot2DManager::setVLineVisible( bool visible ){
-    if ( m_plotGenerator ){
-        m_plotGenerator->setMarkerLineVisible( visible );
-        updatePlot();
-    }
-}
-
 
 
 void Plot2DManager::startSelection(const QString& params ){
@@ -571,7 +470,7 @@ void Plot2DManager::updatePlot( ){
     if ( m_plotGenerator ){
         //User is selecting a range.
         if ( m_selectionEnabled ){
-            m_plotGenerator->setRangePixels( m_selectionStart, m_selectionEnd);
+            m_plotGenerator->setRangePixels( m_selectionStart, m_selectionEnd );
         }
         else if ( m_selectionEnabledColor ){
             m_plotGenerator->setRangePixelsColor( m_selectionStart, m_selectionEnd );
@@ -583,21 +482,15 @@ void Plot2DManager::updatePlot( ){
 }
 
 
-void Plot2DManager::updateSelection(int x, int y, int index){
+void Plot2DManager::updateSelection(int x, int y, int width, int height){
     m_selectionEnd = x;
     if ( m_selectionEnabled || m_selectionEnabledColor ){
        updatePlot();
     }
     else {
        if ( m_cursorEnabled ){
-           bool valid = false;
-           QPointF imageValue = m_plotGenerator->getImagePoint( QPointF(x, y), &valid, index );
-           if ( valid ){
-               emit cursorMove( imageValue.x(), imageValue.y() );
-           }
-           else {
-               setCursorText( "");
-           }
+           std::pair<double,double> worldValue = m_plotGenerator->getWorldPt( x, y, width, height );
+           emit cursorMove( worldValue.first, worldValue.second );
        }
     }
 }
@@ -608,7 +501,6 @@ void Plot2DManager::_updateSize( const QSize& size ){
         bool newSize = m_plotGenerator->setSize( size.width(), size.height());
         if ( newSize ){
             updatePlot();
-            emit plotSizeChanged();
         }
     }
 }

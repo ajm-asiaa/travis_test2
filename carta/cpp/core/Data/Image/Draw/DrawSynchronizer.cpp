@@ -43,7 +43,7 @@ DrawSynchronizer::DrawSynchronizer( std::shared_ptr<Carta::Core::ImageRenderServ
 void DrawSynchronizer::_checkAndEmit(){
     // emit done only if all three are finished
     if ( m_grsDone && m_irsDone && m_cecDone ) {
-        emit done( m_irsImage, m_grsVGList, m_cecVGList, m_regionVGList, m_jobId );
+        emit done( m_irsImage, m_grsVGList, m_cecVGList, m_jobId );
     }
 }
 
@@ -87,9 +87,9 @@ void DrawSynchronizer::setInput( std::shared_ptr<Carta::Lib::NdArray::RawViewInt
     m_cec->setInput( rawView );
 }
 
+
 void DrawSynchronizer::setContours( const std::set<std::shared_ptr<DataContours> > & contours ){
     std::vector<double> levels;
-    QString contourType;
     bool drawing = false;
     m_pens.clear();
     for( std::set< std::shared_ptr<DataContours> >::iterator it = contours.begin();
@@ -100,19 +100,11 @@ void DrawSynchronizer::setContours( const std::set<std::shared_ptr<DataContours>
             m_pens.insert( m_pens.end(), setPens.begin(), setPens.end());
             std::vector<double> setLevels = (*it)->getLevels();
             levels.insert( levels.end(), setLevels.begin(), setLevels.end());
-            // get the contour type (Todo: map different contour types to their specific contour levels)
-            contourType = (*it)->getContourType();
         }
-        //qDebug() << "[contour] contour set name:"<< (*it)->getName() << "contour type:" << (*it)->getContourType();
     }
     if ( drawing ){
-        m_cec->setName(contourType);
         m_cec->setLevels( levels );
     }
-}
-
-void DrawSynchronizer::setRegionGraphics( const Carta::Lib::VectorGraphics::VGList& regionVGList ){
-	m_regionVGList = regionVGList;
 }
 
 int64_t DrawSynchronizer::start( bool contourDraw, bool gridDraw, int64_t jobId ){

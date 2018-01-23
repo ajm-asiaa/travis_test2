@@ -29,15 +29,8 @@ enum class UniqueHookIDs {
     GetInitialFileList_ID,
     GetImageRenderService_ID,
     ProfileHook_ID,
-    Fit1DHook_ID,
     ImageStatisticsHook_ID,
-    GetPersistentCache_ID,
-    GetProfileExtractor_ID,
 
-    /// region related stuff, still to be considered experimental
-    CoordSystemHook_ID,
-    DeserializeCoordSysConverterHook_ID,
-    MakeBasicCoordConverterHook_ID,
 
     /// experimental, soon to be removed:
     PreRender_ID,

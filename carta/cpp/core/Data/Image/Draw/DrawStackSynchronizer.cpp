@@ -11,20 +11,11 @@ namespace Carta {
 namespace Data {
 
 
-DrawStackSynchronizer::DrawStackSynchronizer( Carta::Lib::LayeredViewArbitrary* view ){
+DrawStackSynchronizer::DrawStackSynchronizer( Carta::Lib::LayeredRemoteVGView* view ){
     m_repaintFrameQueued = false;
     m_selectIndex = -1;
     m_view.reset( view );
-    // listen for resize events
     connect( m_view.get(), SIGNAL(sizeChanged()), this, SIGNAL( viewResize() ) );
-    // listen for input events
-    connect( m_view.get(), SIGNAL(inputEvent(InputEvent)),
-    		this, SIGNAL( inputEvent(InputEvent)) );
-}
-
-void DrawStackSynchronizer::_clear(){
-    m_view->removeAllLayers();
-    QMetaObject::invokeMethod( this, "_repaintFrameNow", Qt::QueuedConnection );
 }
 
 QSize DrawStackSynchronizer::getClientSize() const {
@@ -32,37 +23,22 @@ QSize DrawStackSynchronizer::getClientSize() const {
 }
 
 
-QList<std::shared_ptr<Layer> > DrawStackSynchronizer::_getLoadableData( const std::shared_ptr<RenderRequest>& request ){
-	QList<std::shared_ptr<Layer> > loadables;
-	QList<std::shared_ptr<Layer> > datas = request->getData();
-	std::vector<int> frames = request->getFrames();
-	int dataCount = datas.size();
-	for ( int i = 0; i < dataCount; i++ ){
-		if ( datas[i]->_isLoadable(frames) ){
-			loadables.push_back( datas[i] );
-		}
-	}
-	return loadables;
-}
-
 void DrawStackSynchronizer::_repaintFrameNow(){
     m_view->scheduleRepaint();
-
 }
 
-void DrawStackSynchronizer::_render( const std::shared_ptr<RenderRequest>& request ){
+
+void DrawStackSynchronizer::_render( QList<std::shared_ptr<Layer> >& datas,
+        const std::shared_ptr<RenderRequest>& request ){
     if ( m_repaintFrameQueued ){
-        emit done( false );
         return;
     }
     QSize clientSize = getClientSize();
+
     if ( clientSize.width() <= 1 || clientSize.height() <= 1 ){
-        emit done( false );
         return;
     }
-
     m_repaintFrameQueued = true;
-    QList<std::shared_ptr<Layer> > datas = _getLoadableData( request );
     int dataCount = datas.size();
     m_images.clear();
     m_layers = datas;
@@ -70,7 +46,6 @@ void DrawStackSynchronizer::_render( const std::shared_ptr<RenderRequest>& reque
     m_selectIndex = topIndex;
     m_renderCount = 0;
     m_redrawCount = dataCount;
-
     for ( int i = 0; i < dataCount; i++ ){
         if ( datas[i]->_isVisible() ){
             connect( datas[i].get(), SIGNAL(renderingDone(const std::shared_ptr<RenderResponse>&)),
@@ -81,22 +56,20 @@ void DrawStackSynchronizer::_render( const std::shared_ptr<RenderRequest>& reque
                 topOfStack = true;
             }
             std::shared_ptr<RenderRequest> layerRequest( new RenderRequest(
-                                   *request ));
-            layerRequest->setStackTop( topOfStack );
-            datas[i]->_render( layerRequest );
+                                   request->getFrames(), request->getCoordinateSystem(),
+                                   topOfStack, request->getOutputSize() ));
+            datas[i]->_viewResize( clientSize );
+            datas[i]->_render( /*frames, cs, topOfStack, size*/layerRequest );
         }
     }
     if ( dataCount == 0 ){
-
+        m_view->resetLayers();
         m_repaintFrameQueued = false;
-        _clear();
-        emit done( true );
+        QMetaObject::invokeMethod( this, "_repaintFrameNow", Qt::QueuedConnection );
     }
 }
 
-
 void DrawStackSynchronizer::_scheduleFrameRepaint( const std::shared_ptr<RenderResponse>& response ){
-
     if ( !m_repaintFrameQueued ){
         return;
     }
@@ -106,7 +79,8 @@ void DrawStackSynchronizer::_scheduleFrameRepaint( const std::shared_ptr<RenderR
     if ( m_renderCount != m_redrawCount ) {
         return;
     }
-    m_view->removeAllLayers();
+
+    m_view->resetLayers();
 
     //We want the selected index to be the last one in the stack.
     int dataCount = m_layers.size();
@@ -121,38 +95,23 @@ void DrawStackSynchronizer::_scheduleFrameRepaint( const std::shared_ptr<RenderR
             if ( m_images.contains( layerName ) ){
                 QImage image = m_images[layerName]->getImage();
                 Carta::Lib::VectorGraphics::VGList graphicsList = m_images[layerName]->getVectorGraphics();
-                m_view->setLayerRaster( stackIndex, image, false );
+                m_view->setRasterLayer( stackIndex, image );
                 std::shared_ptr<Carta::Lib::AlphaCombiner> alphaCombine =
                         std::make_shared<Carta::Lib::AlphaCombiner>();
                 float alphaVal = m_layers[dIndex]->_getMaskAlpha();
                 alphaCombine-> setAlpha( alphaVal );
-                m_view->setLayerCombiner( stackIndex, alphaCombine );
-                stackIndex++;
-                m_view->setLayerVG( stackIndex, graphicsList );
+                m_view->setRasterLayerCombiner( stackIndex, alphaCombine );
+                m_view->setVGLayer( stackIndex, graphicsList );
                 stackIndex++;
             }
         }
     }
-
-
     m_repaintFrameQueued = false;
-
-    // create a copy, since "emit done" will invoke "DrawStackSynchronizer::_render"
-    // which will call "m_layers = datas;"
-    QList< std::shared_ptr<Layer> > m_layers_copy = m_layers;
-
-    emit done( true );
-
-    // QMetaObject::invokeMethod( this, "_repaintFrameNow", Qt::QueuedConnection );
+    QMetaObject::invokeMethod( this, "_repaintFrameNow", Qt::QueuedConnection );
     for ( int i = 0; i < dataCount; i++ ){
-        m_layers_copy[i]->_renderDone();
+        m_layers[i]->_renderDone();
     }
-
-    m_view->scheduleRepaint();
-
 }
-
-
 
 
 DrawStackSynchronizer::~DrawStackSynchronizer(){

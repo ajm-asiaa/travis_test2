@@ -14,9 +14,7 @@ qx.Class.define("skel.widgets.Image.Grid.Settings.SettingsGridPage", {
      */
     construct : function( ) {
         this.base(arguments, "Settings", "");
-        if ( typeof mImport !== "undefined"){
-        	this.m_connector = mImport("connector");
-        }
+        this.m_connector = mImport("connector");
         this._init();
     },
 
@@ -88,13 +86,11 @@ qx.Class.define("skel.widgets.Image.Grid.Settings.SettingsGridPage", {
          * Sends a command to the server to change whether or not the grid lines are visible.
          */
         _sendShowGridLinesCmd : function(){
-        	if ( this.m_connector !== null ){
-        		var path = skel.widgets.Path.getInstance();
-        		var cmd = this.m_id + path.SEP_COMMAND + "setShowGridLines";
-        		var showLines = this.m_showGridLines.getValue();
-        		var params = "showGridLines:"+showLines;
-        		this.m_connector.sendCommand( cmd, params, function(){});
-        	}
+            var path = skel.widgets.Path.getInstance();
+            var cmd = this.m_id + path.SEP_COMMAND + "setShowGridLines";
+            var showLines = this.m_showGridLines.getValue();
+            var params = "showGridLines:"+showLines;
+            this.m_connector.sendCommand( cmd, params, function(){});
         },
 
         /**
@@ -109,17 +105,6 @@ qx.Class.define("skel.widgets.Image.Grid.Settings.SettingsGridPage", {
                 this._setSpacing( controls.grid.spacing );
             }
         },
-        
-        /**
-         * Set the enabled status of the custom grid controls based on
-         * whether the grid lines are being shown or not.
-         */
-        _setControlsEnabledStatus : function(){
-        	var enabled = this.m_showGridLines.getValue();
-        	this.m_thickness.setEnabled( enabled );
-        	this.m_spacing.setEnabled( enabled );
-        	this.m_transparency.setEnabled( enabled );
-        },
 
         
         /**
@@ -127,18 +112,14 @@ qx.Class.define("skel.widgets.Image.Grid.Settings.SettingsGridPage", {
          * @param showGridLines {boolean} - true if the grid lines should be visible; false otherwise.
          */
         _setShowGridLines : function ( showGridLines ){
-            if ( typeof showGridLines !== "undefined"){ 
-                if ( this.m_showGridLines.getValue() != showGridLines ){
-                	this.m_showGridLines.removeListenerById( this.m_showListenerId );
-                	this.m_showGridLines.setValue( showGridLines );
-                	this.m_showListenerId = this.m_showGridLines.addListener( skel.widgets.Path.CHANGE_VALUE, 
+            if ( typeof showGridLines !== "undefined" && 
+                    this.m_showGridLines.getValue() != showGridLines ){
+                this.m_showGridLines.removeListenerById( this.m_showListenerId );
+                this.m_showGridLines.setValue( showGridLines );
+                this.m_showListenerId = this.m_showGridLines.addListener( skel.widgets.Path.CHANGE_VALUE, 
                         this._sendShowGridLinesCmd, this );
-                }
-                this._setControlsEnabledStatus();
             }
-            
         },
-        
 
         /**
          * Set the thickness of the grid lines.

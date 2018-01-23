@@ -45,7 +45,7 @@ LayoutNodeComposite::LayoutNodeComposite( const QString& path, const QString& id
 
 
 bool LayoutNodeComposite::_addWindow( const QString& nodeId, const QString& position,
-        const QString& childKey, std::unique_ptr<LayoutNode>& child, int index ){
+        const QString& childKey, std::unique_ptr<LayoutNode>& child ){
     bool windowAdded = false;
     if ( child.get() != nullptr ){
         QString childId = child->getPath();
@@ -63,17 +63,6 @@ bool LayoutNodeComposite::_addWindow( const QString& nodeId, const QString& posi
             if ( newComp != nullptr ){
                 windowAdded = true;
                 LayoutNode* emptyChild = NodeFactory::makeLeaf();
-                emptyChild->setIndex( index );
-                int oldWidth = oldComp->getWidth();
-                int oldHeight = oldComp->getHeight();
-                if ( position == NodeFactory::POSITION_TOP || position==NodeFactory::POSITION_BOTTOM ){
-                	emptyChild->setSize( oldWidth, oldHeight / 2 );
-                	oldComp->setSize( oldWidth, oldHeight / 2 );
-                }
-                else {
-                	emptyChild->setSize( oldWidth / 2, oldHeight );
-                	oldComp->setSize( oldWidth / 2, oldHeight );
-                }
                 //Make the old child a child of the composite as well as the empty leaf.
                 if ( position == NodeFactory::POSITION_TOP || position == NodeFactory::POSITION_LEFT ){
                     newComp->setChildSecond( oldComp );
@@ -93,10 +82,10 @@ bool LayoutNodeComposite::_addWindow( const QString& nodeId, const QString& posi
 }
 
 
-bool LayoutNodeComposite::addWindow( const QString& nodeId, const QString& position, int index ){
-    bool windowAdded = _addWindow( nodeId, position, PLUGIN_LEFT, m_firstChild, index );
+bool LayoutNodeComposite::addWindow( const QString& nodeId, const QString& position ){
+    bool windowAdded = _addWindow( nodeId, position, PLUGIN_LEFT, m_firstChild );
     if ( !windowAdded ){
-        windowAdded = _addWindow( nodeId, position, PLUGIN_RIGHT, m_secondChild, index );
+        windowAdded = _addWindow( nodeId, position, PLUGIN_RIGHT, m_secondChild );
     }
     return windowAdded;
 }
@@ -219,7 +208,7 @@ QStringList LayoutNodeComposite::getPluginList() const {
     return plugins;
 }
 
-QString LayoutNodeComposite::getStateString( const QString& /*sessionId*/, SnapshotType /*type*/ ) const {
+QString LayoutNodeComposite::getStateString() const {
     Carta::State::StateInterface compState( "");
     compState.setState( m_state.toString());
     if ( m_firstChild.get() != nullptr ){
@@ -240,23 +229,14 @@ void LayoutNodeComposite::_initializeDefaultState(){
     m_state.insertValue<bool>( HORIZONTAL, true );
     m_state.insertObject( PLUGIN_LEFT);
     m_state.insertObject( PLUGIN_RIGHT);
-
     QString idLookupLeft = UtilState::getLookup( PLUGIN_LEFT, Util::ID );
     QString typeLookupLeft = UtilState::getLookup( PLUGIN_LEFT, COMPOSITE );
-    QString widthLookupLeft = UtilState::getLookup( PLUGIN_LEFT, Util::WIDTH );
-    QString heightLookupLeft = UtilState::getLookup( PLUGIN_LEFT, Util::HEIGHT );
     m_state.insertValue<QString>( idLookupLeft, "");
     m_state.insertValue<bool>( typeLookupLeft, false);
-    m_state.insertValue<int>(widthLookupLeft, 1 );
-    m_state.insertValue<int>(heightLookupLeft, 1 );
     QString idLookupRight = UtilState::getLookup( PLUGIN_RIGHT, Util::ID );
     QString typeLookupRight = UtilState::getLookup( PLUGIN_RIGHT, COMPOSITE );
-    QString widthLookupRight = UtilState::getLookup( PLUGIN_RIGHT, Util::WIDTH );
-    QString heightLookupRight = UtilState::getLookup( PLUGIN_RIGHT, Util::HEIGHT );
     m_state.insertValue<QString>( idLookupRight, "");
     m_state.insertValue<bool>( typeLookupRight, false);
-    m_state.insertValue<int>( widthLookupRight, 1 );
-    m_state.insertValue<int>( heightLookupRight, 1 );
     m_state.flushState();
 }
 
@@ -313,24 +293,12 @@ bool LayoutNodeComposite::_removeWindow( const QString& nodeId,
     return windowRemoved;
 }
 void LayoutNodeComposite::resetState( const QString& state, QMap<QString,int>& usedPlugins ){
-    LayoutNode::resetState( state, usedPlugins );
     Carta::State::StateInterface newState( "" );
     newState.setState( state );
     bool newHorizontal = newState.getValue<bool>( HORIZONTAL );
     setHorizontal( newHorizontal );
     _resetStateChild( PLUGIN_LEFT, m_firstChild, newState, usedPlugins );
     _resetStateChild( PLUGIN_RIGHT, m_secondChild, newState, usedPlugins );
-
-    int width = m_firstChild->getWidth();
-    if ( newHorizontal ){
-        width = width + m_secondChild->getWidth();
-    }
-    int height = m_firstChild->getHeight();
-    if ( !newHorizontal ){
-        height = height + m_secondChild->getHeight();
-    }
-    m_state.setValue<int>( Util::WIDTH, width );
-    m_state.setValue<int>( Util::HEIGHT, height );
     m_state.flushState();
 }
 
@@ -356,8 +324,7 @@ void LayoutNodeComposite::_resetStateChild( const QString& childKey, std::unique
 
     //Reset the state of the child.
     child->resetState( childState, usedPlugins );
-    _updateChildState(  childKey, child.get() );
-
+    _updateChildState( childKey, child->getPath(), child->isComposite());
 }
 
 
@@ -367,13 +334,12 @@ void LayoutNodeComposite::_setChild( const QString& key,
         QString lookup = Carta::State::UtilState::getLookup( key, Util::ID);
         QString oldLookup = m_state.getValue<QString>( lookup );
         if ( node->getPath() !=  oldLookup ){
-            if ( child ){
-                if ( !destroy ){
-                    child.release();
-                }
+            if ( !destroy ){
+                child.release();
             }
             child.reset( node );
-            _updateChildState( key, node );
+
+            _updateChildState( key, node->getPath(), node->isComposite());
             m_state.flushState();
         }
     }
@@ -434,35 +400,9 @@ bool LayoutNodeComposite::setPlugins( QStringList& names, QMap<QString,int>& use
     return pluginSetOne && pluginSetTwo;
 }
 
-QString LayoutNodeComposite::setSize( int width, int height ){
-	QString result;
-	if ( width >= 0 && height >= 0 ){
-		m_state.setValue<int>(Util::WIDTH, width);
-		m_state.setValue<int>(Util::HEIGHT, height );
-		//If we have children, we have to divide up the space among them.
-		int childHeight = height / 2;
-		int childWidth = width;
-		if ( m_state.getValue<bool>( HORIZONTAL ) ){
-			childHeight = height;
-			childWidth = width / 2;
-		}
-		if ( m_firstChild ){
-			m_firstChild->setSize( childWidth, childHeight );
-		}
-		if ( m_secondChild ){
-			m_secondChild->setSize( childWidth, childHeight );
-		}
-	}
-	else {
-		result="Width/height of layout cell must be nonnegative: ("+
-				QString::number(width)+","+QString::number(height)+")";
-	}
-	return result;
-}
-
 
 QString LayoutNodeComposite::toString() const {
-    QString result = "Composite: "+getPath();
+    QString result = LayoutNode::toString();
     if ( m_firstChild.get() != nullptr ){
         result.append( "\nLeft: "+m_firstChild->toString() );
     }
@@ -472,10 +412,7 @@ QString LayoutNodeComposite::toString() const {
     return result;
 }
 
-void LayoutNodeComposite::_updateChildState( const QString& childKey,
-        LayoutNode* child ){
-    QString id =  child->getPath();
-    bool composite =  child->isComposite();
+void LayoutNodeComposite::_updateChildState( const QString& childKey, const QString& id, bool composite ){
     QString idLookup = Carta::State::UtilState::getLookup( childKey, Util::ID);
     QString oldId = m_state.getValue<QString>( idLookup );
     if ( oldId != id ){
@@ -486,13 +423,6 @@ void LayoutNodeComposite::_updateChildState( const QString& childKey,
     if ( oldComposite != composite ){
         m_state.setValue<bool>( compLookup, composite);
     }
-
-    int width = child->getWidth();
-    int height = child->getHeight();
-    QString widthLookup = Carta::State::UtilState::getLookup( childKey, Util::WIDTH );
-    QString heightLookup = Carta::State::UtilState::getLookup( childKey, Util::HEIGHT );
-    m_state.setValue<int>( widthLookup, width );
-    m_state.setValue<int>( heightLookup, height );
 }
 
 LayoutNodeComposite::~LayoutNodeComposite(){

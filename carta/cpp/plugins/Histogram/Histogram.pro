@@ -11,15 +11,13 @@ CONFIG += plugin
 SOURCES += \
     IImageHistogram.cpp \
     ImageHistogram.cpp \
-    Histogram1.cpp \
-    ImageRegionGenerator.cpp
+    Histogram1.cpp
 
 
 HEADERS += \
     IImageHistogram.h \
     ImageHistogram.h \
-    Histogram1.h \
-    ImageRegionGenerator.h
+    Histogram1.h
 
 
 casacoreLIBS += -L$${CASACOREDIR}/lib
@@ -58,10 +56,3 @@ else{
     PRE_TARGETDEPS += $$OUT_PWD/../../core/libcore.so
 }
 
-unix:!macx {
-  QMAKE_RPATHDIR=$$OUT_PWD/../../../../../CARTAvis-externals/ThirdParty/casa/trunk/linux/lib
-  QMAKE_RPATHDIR+=$${WCSLIBDIR}/lib
-}
-else {
-
-}

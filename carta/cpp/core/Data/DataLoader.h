@@ -85,8 +85,6 @@ private:
 
     static bool m_registered;
 
-    QString lastAccessedDir = "";
-
     class Factory;
 
     const static QString DIR;
@@ -96,12 +94,8 @@ private:
     //Look for eligible data files in a specific directory (recursive).
     void _processDirectory(const QDir& rootDir, QJsonObject& rootArray) const;
 
-    //Check whether the dir is casa or miriad format, others are null
-    //return the format in json to set icons
-    QString _checkSubDir( QString& subDirPath) const;
-
     //Add a file to the list of those available in a given directory.
-    void _makeFileNode(QJsonArray& parentArray, const QString& fileName, const QString& fileType) const;
+    void _makeFileNode(QJsonArray& parentArray, const QString& fileName) const;
     //Add a subdirectory to the list of available files.
     void _makeFolderNode( QJsonArray& parentArray, const QString& fileName ) const;
     DataLoader( const QString& path, const QString& id);

@@ -7,8 +7,6 @@
 #include "State/UtilState.h"
 #include "State/StateInterface.h"
 #include "Data/Image/Controller.h"
-#include "Data/Image/ImageContext.h"
-#include "Data/Image/ImageZoom.h"
 #include "Data/Histogram/Histogram.h"
 #include "Data/Profile/Profiler.h"
 #include "Data/Statistics/Statistics.h"
@@ -40,15 +38,11 @@ const QString Layout::LAYOUT_COLS = "cols";
 const QString Layout::LAYOUT_PLUGINS = "plugins";
 const QString Layout::POSITION = "position";
 const QString Layout::CLASS_NAME = "Layout";
-
-const QString Layout::TYPE_DEFAULT = "Default";
-const QString Layout::TYPE_ANALYSIS = "Analysis"; //Line Analysis
-const QString Layout::TYPE_HISTOGRAMANALYSIS = "HistogramAnalysis";
-const QString Layout::TYPE_IMAGECOMPOSITE = "ImageComposite";
 const QString Layout::TYPE_IMAGE = "Image";
+const QString Layout::TYPE_ANALYSIS = "Analysis";
 const QString Layout::TYPE_CUSTOM = "Custom";
-
 const QString Layout::TYPE_SELECTED = "layoutType";
+
 
 bool Layout::m_registered =
         Carta::State::ObjectManager::objectManager()->registerClass ( CLASS_NAME,
@@ -62,7 +56,6 @@ Layout::Layout( const QString& path, const QString& id):
     _initializeDefaultState();
     _initializeCommands();
 }
-
 
 QString Layout::addWindow( const QStringList& windowIds, const QString& position ){
     QString msg;
@@ -82,9 +75,8 @@ QString Layout::addWindow( const QStringList& windowIds, const QString& position
         QString childId;
         LayoutNode* progenitor = m_layoutRoot->findAncestor( windowIds, childId );
         bool windowAdded = false;
-        int emptyCount = _getPluginCount( NodeFactory::EMPTY );
         if ( progenitor != nullptr ){
-            windowAdded = progenitor->addWindow( childId, position, emptyCount );
+            windowAdded = progenitor->addWindow( childId, position );
             if ( ! windowAdded ){
                 msg = "Unable to add window at "+ position;
             }
@@ -100,7 +92,6 @@ QString Layout::addWindow( const QStringList& windowIds, const QString& position
             }
             _makeRoot(horizontal);
             LayoutNode* emptyChild = NodeFactory::makeLeaf();
-            emptyChild->setIndex( emptyCount );
             if ( position == NodeFactory::POSITION_LEFT || position == NodeFactory::POSITION_TOP ){
                 m_layoutRoot->setChildSecond( oldRoot );
                 m_layoutRoot->setChildFirst( emptyChild );
@@ -136,7 +127,7 @@ void Layout::clear(){
 }
 
 
-QString Layout::getStateString( const QString& /*sessionId*/, SnapshotType /*type*/ ) const {
+QString Layout::getStateString() const {
     Carta::State::StateInterface layoutState("");
     layoutState.setState( m_state.toString());
     layoutState.insertObject( "nodes", m_layoutRoot->getStateString());
@@ -321,13 +312,6 @@ void Layout::_initLayout( LayoutNode* root, int rowCount, int colCount ){
    }
 }
 
-bool Layout::isLayoutDefault() const {
-    bool isCurrentLayout = false;
-    if ( m_state.getValue<QString>(TYPE_SELECTED) == TYPE_DEFAULT ){
-        isCurrentLayout = true;
-    }
-    return isCurrentLayout;
-}
 
 bool Layout::isLayoutAnalysis() const {
     bool layoutAnalysis = false;
@@ -337,20 +321,6 @@ bool Layout::isLayoutAnalysis() const {
     return layoutAnalysis;
 }
 
-bool Layout::isLayoutHistogramAnalysis() const {
-    bool isCurrentLayout = false;
-    if ( m_state.getValue<QString>(TYPE_SELECTED) == TYPE_HISTOGRAMANALYSIS ){
-        isCurrentLayout = true;
-    }
-    return isCurrentLayout;
-}
-
-bool Layout::isLayoutImageComposite() const {
-    if ( m_state.getValue<QString>(TYPE_SELECTED) == TYPE_IMAGECOMPOSITE ){
-        return true;
-    }
-    return false;
-}
 
 bool Layout::isLayoutImage() const {
     bool layoutImage = false;
@@ -359,6 +329,7 @@ bool Layout::isLayoutImage() const {
     }
     return layoutImage;
 }
+
 
 void Layout::_makeRoot( bool horizontal ){
     Carta::State::ObjectManager* objMan = Carta::State::ObjectManager::objectManager();
@@ -438,63 +409,30 @@ QString Layout::_removeWindow( const QString& locationId ){
     return result;
 }
 
-void Layout::setLayoutDefault(bool cleanPluginList) {
 
-    QStringList oldNames;
-
-    if (cleanPluginList) {
-        oldNames = getPluginList();
-    } else {
-        oldNames = QStringList();
-    }
-
+void Layout::setLayoutAnalysis(){
+    QStringList oldNames = getPluginList();
     _makeRoot();
 
     LayoutNode* rightTop = NodeFactory::makeComposite( false );
 
-    LayoutNode* statLeaf = NodeFactory::makeLeaf( Statistics::CLASS_NAME );
-    rightTop->setChildFirst( statLeaf );
+    LayoutNode* histLeaf = NodeFactory::makeLeaf( Histogram::CLASS_NAME );
+    rightTop->setChildFirst( histLeaf );
+
     LayoutNode* hiddenLeaf = NodeFactory::makeLeaf( NodeFactory::HIDDEN );
     rightTop->setChildSecond( hiddenLeaf );
 
     LayoutNode* rightBottom = NodeFactory::makeComposite( false );
+
     LayoutNode* colorLeaf = NodeFactory::makeLeaf( Colormap::CLASS_NAME );
     rightBottom->setChildFirst( colorLeaf );
+
     LayoutNode* animLeaf = NodeFactory::makeLeaf( Animator::CLASS_NAME );
     rightBottom->setChildSecond( animLeaf );
 
     LayoutNode* right = NodeFactory::makeComposite( false );
 
     right->setChildFirst( rightTop );
-    right->setChildSecond( rightBottom );
-
-    m_layoutRoot->setHorizontal( true );
-    m_layoutRoot->setChildSecond( right );
-
-    LayoutNode* controlLeaf = NodeFactory::makeLeaf( Controller::PLUGIN_NAME );
-    m_layoutRoot->setChildFirst( controlLeaf );
-    m_state.setValue<QString>( TYPE_SELECTED, TYPE_DEFAULT );
-    QStringList names = getPluginList();
-    emit pluginListChanged( names, oldNames );
-    m_state.flushState();
-}
-
-void Layout::setLayoutAnalysis(){
-    QStringList oldNames = getPluginList();
-    _makeRoot();
-
-    // LayoutNode* rightTop = NodeFactory::makeComposite( false );
-
-    LayoutNode* rightBottom = NodeFactory::makeComposite( false );
-    LayoutNode* colorLeaf = NodeFactory::makeLeaf( Colormap::CLASS_NAME );
-    rightBottom->setChildFirst( colorLeaf );
-    LayoutNode* animLeaf = NodeFactory::makeLeaf( Animator::CLASS_NAME );
-    rightBottom->setChildSecond( animLeaf );
-
-    LayoutNode* right = NodeFactory::makeComposite( false );
-
-    LayoutNode* profLeaf = NodeFactory::makeLeaf( Profiler::CLASS_NAME );
-    right->setChildFirst( profLeaf );
     right->setChildSecond( rightBottom );
 
     m_layoutRoot->setHorizontal( true );
@@ -508,49 +446,16 @@ void Layout::setLayoutAnalysis(){
     m_state.flushState();
 }
 
-void Layout::setLayoutHistogramAnalysis(){
-    QStringList oldNames = getPluginList();
-    _makeRoot();
-
-    LayoutNode* rightTop = NodeFactory::makeComposite( false );
-    LayoutNode* histLeaf = NodeFactory::makeLeaf( Histogram::CLASS_NAME );
-    rightTop->setChildFirst( histLeaf );
-    LayoutNode* hiddenLeaf = NodeFactory::makeLeaf( NodeFactory::HIDDEN );
-    rightTop->setChildSecond( hiddenLeaf );
-
-    LayoutNode* rightBottom = NodeFactory::makeComposite( false );
-    LayoutNode* colorLeaf = NodeFactory::makeLeaf( Colormap::CLASS_NAME );
-    rightBottom->setChildFirst( colorLeaf );
-    LayoutNode* animLeaf = NodeFactory::makeLeaf( Animator::CLASS_NAME );
-    rightBottom->setChildSecond( animLeaf );
-
-    LayoutNode* right = NodeFactory::makeComposite( false );
-
-    right->setChildFirst( rightTop );
-    right->setChildSecond( rightBottom );
-
-    m_layoutRoot->setHorizontal( true );
-    m_layoutRoot->setChildSecond( right );
-
-    LayoutNode* controlLeaf = NodeFactory::makeLeaf( Controller::PLUGIN_NAME );
-    m_layoutRoot->setChildFirst( controlLeaf );
-    m_state.setValue<QString>( TYPE_SELECTED, TYPE_HISTOGRAMANALYSIS );
-    QStringList names = getPluginList();
-    emit pluginListChanged( names, oldNames );
-    m_state.flushState();
-}
 
 void Layout::setLayoutDeveloper(){
     _makeRoot();
     QStringList oldNames = getPluginList();
     LayoutNode* rightBottom = NodeFactory::makeComposite( false );
 
-    LayoutNode* colorLeaf = NodeFactory::makeLeaf( Colormap::CLASS_NAME );
-    rightBottom->setChildFirst( colorLeaf );
-    //LayoutNode* histLeaf = NodeFactory::makeLeaf( Histogram::CLASS_NAME );
-    //rightBottom->setChildFirst( histLeaf );
-    //LayoutNode* contextLeaf = NodeFactory::makeLeaf( ImageContext::CLASS_NAME );
-    //rightBottom->setChildFirst( contextLeaf );
+    //LayoutNode* colorLeaf = NodeFactory::makeLeaf( Colormap::CLASS_NAME );
+    //rightBottom->setChildFirst( colorLeaf );
+    LayoutNode* histLeaf = NodeFactory::makeLeaf( Histogram::CLASS_NAME );
+    rightBottom->setChildFirst( histLeaf );
 
     LayoutNode* animLeaf = NodeFactory::makeLeaf( Animator::CLASS_NAME );
     rightBottom->setChildSecond( animLeaf );
@@ -564,8 +469,6 @@ void Layout::setLayoutDeveloper(){
     //right->setChildFirst( statLeaf );
     LayoutNode* profLeaf = NodeFactory::makeLeaf( Profiler::CLASS_NAME );
     right->setChildFirst( profLeaf );
-    //LayoutNode* imageZoomLeaf = NodeFactory::makeLeaf( ImageZoom::CLASS_NAME );
-    //right->setChildFirst( imageZoomLeaf );
     right->setChildSecond( rightBottom );
 
     m_layoutRoot->setHorizontal( true );
@@ -580,41 +483,6 @@ void Layout::setLayoutDeveloper(){
 }
 
 
-void Layout::setLayoutImageComposite(){
-    QStringList oldNames = getPluginList();
-    _makeRoot();
-
-    LayoutNode* rightTop = NodeFactory::makeComposite( false );
-    rightTop->setHorizontal( true );
-    //Image Contxt
-    LayoutNode* contextLeaf = NodeFactory::makeLeaf( ImageContext::CLASS_NAME );
-    rightTop->setChildFirst( contextLeaf  );
-    LayoutNode* zoomLeaf = NodeFactory::makeLeaf( ImageZoom::CLASS_NAME );
-    rightTop->setChildSecond( zoomLeaf );
-
-    LayoutNode* rightBottom = NodeFactory::makeComposite( false );
-    LayoutNode* colorLeaf = NodeFactory::makeLeaf( Colormap::CLASS_NAME );
-    rightBottom->setChildFirst( colorLeaf );
-    LayoutNode* animLeaf = NodeFactory::makeLeaf( Animator::CLASS_NAME );
-    rightBottom->setChildSecond( animLeaf );
-
-    LayoutNode* right = NodeFactory::makeComposite( false );
-
-    right->setChildFirst( rightTop );
-    right->setChildSecond( rightBottom );
-
-    m_layoutRoot->setHorizontal( true );
-    m_layoutRoot->setChildSecond( right );
-
-    //Image Loader
-    LayoutNode* controlLeaf = NodeFactory::makeLeaf( Controller::PLUGIN_NAME );
-    m_layoutRoot->setChildFirst( controlLeaf );
-
-    QStringList names = getPluginList();
-    emit pluginListChanged( names, oldNames );
-    m_state.setValue<QString>( TYPE_SELECTED, TYPE_IMAGECOMPOSITE );
-    m_state.flushState();
-}
 
 void Layout::setLayoutImage(){
     QStringList oldNames = getPluginList();

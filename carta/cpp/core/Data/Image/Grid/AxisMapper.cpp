@@ -23,8 +23,8 @@ const QString AxisMapper::STOKES = "Stokes";
 const QString AxisMapper::TABULAR = "Tabular";
 const QString AxisMapper::QUALITY = "Quality";
 
-
-std::multimap<Carta::Lib::AxisInfo::KnownType, QString> AxisMapper::axisMap;
+const QList<QString> AxisMapper::m_purposes( {RIGHT_ASCENSION, DECLINATION, SPECTRAL,
+    STOKES, TABULAR, QUALITY, LINEAR});
 
 AxisMapper::AxisMapper(){
 
@@ -73,46 +73,62 @@ QStringList AxisMapper::getDisplayNames(){
     return names;
 }
 
-QString AxisMapper::getPurpose( Carta::Lib::AxisInfo::KnownType type){
-    return (axisMap.find(type) != axisMap.end()) ?
-                axisMap.find(type)->second : QString("Undefined");
-}
-
-QString AxisMapper::getAnimatorPurpose( Carta::Lib::AxisInfo::KnownType type){
-    if(type == Carta::Lib::AxisInfo::KnownType::SPECTRAL){
-        return QString("Channel");
+QString AxisMapper::getPurpose( Carta::Lib::AxisInfo::KnownType type,
+        const Carta::Lib::KnownSkyCS& cs ){
+    QString name;
+    if ( type == Carta::Lib::AxisInfo::KnownType::DIRECTION_LON ){
+        name = _getAxisRAPurpose( cs );
     }
-    return getPurpose(type);
-}
-
-void AxisMapper::cleanAxisMap(){
-    axisMap.clear();
-}
-
-void AxisMapper::setAxisMap( AxisMapData supplant, QString target ){
-    std::multimap<Carta::Lib::AxisInfo::KnownType, QString>::iterator
-            iter = axisMap.find(supplant.first);
-    // if there is any axis with the same type, check whether
-    // we do want replace the name.
-    if(iter != axisMap.end() && iter->second == target){
-        axisMap.erase(iter);
+    else if ( type == Carta::Lib::AxisInfo::KnownType::DIRECTION_LAT ){
+        name = _getAxisDECPurpose( cs );
     }
-    axisMap.insert(supplant);
+    else {
+        int typeIndex = static_cast<int>( type );
+        if ( typeIndex < m_purposes.size() ){
+            name = m_purposes[typeIndex];
+        }
+    }
+    return name;
+}
+
+QString AxisMapper::getPurpose( const QString& purpose ){
+    QString actualPurpose;
+    int purposeCount = m_purposes.size();
+    if ( QString::compare( purpose, LONGITUDE, Qt::CaseInsensitive) == 0 ){
+        actualPurpose = LONGITUDE;
+    }
+    else if ( QString::compare( purpose, LATITUDE, Qt::CaseInsensitive) == 0 ){
+        actualPurpose = LATITUDE;
+    }
+    else {
+        for ( int i = 0; i < purposeCount; i++ ){
+            if ( QString::compare( purpose, m_purposes[i], Qt::CaseInsensitive) == 0 ){
+                actualPurpose = m_purposes[i];
+                break;
+            }
+        }
+    }
+    return actualPurpose;
 }
 
 Carta::Lib::AxisInfo::KnownType AxisMapper::getType( const QString& purpose ){
-
-    std::multimap<Carta::Lib::AxisInfo::KnownType, QString>::iterator iter;
-    // for Animator to display "channel"
-    if(purpose == "Channel"){
-        return Carta::Lib::AxisInfo::KnownType::SPECTRAL;
+    Carta::Lib::AxisInfo::KnownType target = Carta::Lib::AxisInfo::KnownType::OTHER;
+    int purposeCount = m_purposes.size();
+    if ( QString::compare( purpose, LONGITUDE, Qt::CaseInsensitive) == 0 ){
+        target = Carta::Lib::AxisInfo::KnownType::DIRECTION_LON;
     }
-    for( iter = axisMap.begin(); iter != axisMap.end(); iter++){
-        if(iter->second == purpose){
-            return iter->first;
+    else if ( QString::compare( purpose, LATITUDE, Qt::CaseInsensitive) == 0 ){
+        target = Carta::Lib::AxisInfo::KnownType::DIRECTION_LAT;
+    }
+    else {
+        for ( int i = 0; i < purposeCount; i++ ){
+            if ( QString::compare( purpose, m_purposes[i], Qt::CaseInsensitive) == 0 ){
+                target = static_cast<Carta::Lib::AxisInfo::KnownType>(i);
+                break;
+            }
         }
     }
-    return Carta::Lib::AxisInfo::KnownType::OTHER;
+    return target;
 }
 
 

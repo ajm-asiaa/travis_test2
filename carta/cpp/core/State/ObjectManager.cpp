@@ -20,13 +20,13 @@ namespace Carta {
 namespace State {
 
 QList<QString> CartaObjectFactory::globalIds = {"ChannelUnits",
-        "Clips", "Colormaps","ContourGenerateModes","ContourTypes","ContourSpacingModes","ContourStyles",
+        "Clips", "Colormaps","ContourGenerateModes","ContourSpacingModes","ContourStyles",
         "CoordinateSystems","DataLoader","ErrorManager",
         "Gamma","GenerateModes","Fonts",
         "LabelFormats","Layout","LayerCompositionModes","LineStyles",
          "PlotStyles", "ProfilePlotStyles",
          "Preferences", "PreferencesSave","ProfileStatistics",
-         "RegionTypes", "TransformsImage","TransformsData",
+          "TransformsImage","TransformsData",
          "Themes",
          "UnitsFrequency","UnitsIntensity","UnitsSpectral","UnitsWavelength",
          "ViewManager"};
@@ -91,11 +91,7 @@ QString CartaObject::getType() const {
 
 void CartaObject::setIndex( int index ){
     CARTA_ASSERT( index >= 0 );
-    int oldIndex = m_state.getValue<int>( StateInterface::INDEX );
-    if ( oldIndex != index ){
-        m_state.setValue<int>(StateInterface::INDEX, index );
-        m_state.flushState();
-    }
+    m_state.setValue<int>(StateInterface::INDEX, index );
 }
 
 void CartaObject::resetState( const QString& state, SnapshotType type ){
@@ -150,8 +146,9 @@ void CartaObject::unregisterView()
     conn()-> unregisterView( m_path +"/view" );
 }
 
-Carta::Lib::LayeredViewArbitrary* CartaObject::makeRemoteView( const QString& path ){
-	return new Carta::Lib::LayeredViewArbitrary( conn(), path, NULL );
+Carta::Lib::LayeredRemoteVGView* CartaObject::makeRemoteView( const QString& path ){
+     //return Carta::Lib::LayeredRemoteVGView::create( conn(), path );
+     return new Carta::Lib::LayeredRemoteVGView( conn(), path, NULL );
 }
 
 QString CartaObject::getStateLocation( const QString& name ) const
@@ -187,6 +184,8 @@ const QString ObjectManager::DestroyObject = "DestroyObject";
 const QString ObjectManager::STATE_ARRAY = "states";
 const QString ObjectManager::STATE_ID = "id";
 const QString ObjectManager::STATE_VALUE = "state";
+
+std::shared_ptr<ObjectManager> ObjectManager::m_om = nullptr;
 
 ObjectManager::ObjectManager ()
 :       m_root( "CartaObjects"),
@@ -289,7 +288,6 @@ void ObjectManager::printObjects(){
     for(map<QString,ObjectRegistryEntry>::iterator it = m_objects.begin(); it != m_objects.end(); ++it) {
         QString firstId = it->first;
         QString classId = it->second.getClassName();
-        qDebug() << "id="<<firstId<<" class="<<classId;
     }
 }
 
@@ -354,8 +352,10 @@ ObjectManager *
 ObjectManager::objectManager ()
 {
     // Implements a singleton pattern
-    static ObjectManager om;
-    return &om;
+    if ( !m_om ){
+        m_om.reset( new ObjectManager() );
+    }
+    return m_om.get();
 }
 
 ObjectManager::~ObjectManager (){

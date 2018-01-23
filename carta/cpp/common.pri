@@ -3,9 +3,6 @@ defineTest(dbg) {
 #    message( $$1)
 }
 
-DEFINES += "UseCasacoreNamespace=1"
-
-
 ! include(common_config.pri) {
   error( "Could not find the common_config.pri file!" )
 }
@@ -87,22 +84,14 @@ contains( CARTA_CONFIG, addrSanit) {
     message( "- no address sanitization")
 }
 
-unix:macx {
-# Disable openmp on Mac
-}
-else{
-    QMAKE_CXXFLAGS += -fopenmp
-    QMAKE_CFLAGS += -fopenmp
-}
-
 # use gcc 4.8.1
 CONFIG += gcc481
 
-#gcc481 {
-#    COMPILER = g++-4.8
-#} else {
+gcc481 {
+    COMPILER = g++-4.8
+} else {
     COMPILER = g++
-#}
+}
 
 QMAKE_CXX = $${COMPILER}
 QMAKE_LINK = $${COMPILER}
@@ -133,3 +122,4 @@ PROJECT_ROOT = $$IN_PWD
 # add include/depend path to start from root
 INCLUDEPATH += $$PROJECT_ROOT
 DEPENDPATH += $$PROJECT_ROOT
+

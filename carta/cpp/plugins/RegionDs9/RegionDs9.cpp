@@ -4,6 +4,7 @@
 #include "plugins/CasaImageLoader/CCImage.h"
 #include "CartaLib/Hooks/Initialize.h"
 #include "CartaLib/Hooks/LoadRegion.h"
+#include "CartaLib/RegionInfo.h"
 #include "CartaLib/IImage.h"
 
 #include <QDebug>

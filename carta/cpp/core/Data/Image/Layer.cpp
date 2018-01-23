@@ -5,7 +5,7 @@
 #include "Data/Colormap/ColorState.h"
 #include "Data/DataLoader.h"
 #include "Data/Image/LayerCompositionModes.h"
-#include "Data/Image/Render/RenderRequest.h"
+#include "Data/Image/RenderRequest.h"
 #include "State/UtilState.h"
 
 #include <QDebug>
@@ -19,6 +19,8 @@ namespace Data {
 const QString Layer::CLASS_NAME = "Layer";
 const QString Layer::GROUP = "group";
 const QString Layer::LAYER = "layer";
+const QString Layer::SELECTED = "selected";
+const QString Layer::LAYER_NAME = "name";
 
 
 LayerCompositionModes* Layer::m_compositionModes = nullptr;
@@ -81,7 +83,7 @@ std::vector< std::shared_ptr<Carta::Lib::Image::ImageInterface> > Layer::_getIma
     return images;
 }
 
-std::shared_ptr<Layer> Layer::_getLayer( const QString& /*name*/ ){
+std::shared_ptr<Layer> Layer::_getLayer(){
     std::shared_ptr<Layer> layer( nullptr );
     return layer;
 }
@@ -100,12 +102,8 @@ QStringList Layer::_getLayerIds( ) const {
     return idList;
 }
 
-QString Layer::_getFileName() {
-    return "";
-}
-
 QString Layer::_getLayerName() const {
-    return m_state.getValue<QString>( Util::NAME );
+    return m_state.getValue<QString>( LAYER_NAME );
 }
 
 float Layer::_getMaskAlpha() const {
@@ -128,11 +126,11 @@ void Layer::_initializeSingletons( ){
 
 void Layer::_initializeState(){
     m_state.insertValue<bool>(Util::VISIBLE, true );
-    m_state.insertValue<bool>(Util::SELECTED, false );
+    m_state.insertValue<bool>(SELECTED, false );
     QString idStr = getId();
     idStr = idStr.replace( "c", "");
     m_state.insertValue<QString>(Util::ID, idStr);
-    m_state.insertValue<QString>( Util::NAME, "");
+    m_state.insertValue<QString>( LAYER_NAME, "");
 }
 
 bool Layer::_isComposite() const {
@@ -152,13 +150,6 @@ bool Layer::_isEmpty() const {
     return false;
 }
 
-bool Layer::_isOnCelestialPlane( bool ) const {
-    return false;
-}
-
-bool Layer::_isLoadable( const std::vector<int>& /*frames*/ ) const {
-	return false;
-}
 
 bool Layer::_isMatch( const QString& name ) const {
     bool matched = false;
@@ -170,12 +161,9 @@ bool Layer::_isMatch( const QString& name ) const {
 }
 
 bool Layer::_isSelected() const {
-    return m_state.getValue<bool>( Util::SELECTED );
+    return m_state.getValue<bool>( SELECTED );
 }
 
-bool Layer::_isSpectralAxis() const {
-	return false;
-}
 
 bool Layer::_isVisible() const {
     return m_state.getValue<bool>(Util::VISIBLE);
@@ -204,15 +192,15 @@ void Layer::_resetStateContours(const Carta::State::StateInterface& /*restoreSta
 
 void Layer::_resetState( const Carta::State::StateInterface& restoreState ){
     m_state.setValue<bool>(Util::VISIBLE, restoreState.getValue<bool>(Util::VISIBLE) );
-    m_state.setValue<bool>(Util::SELECTED, restoreState.getValue<bool>( Util::SELECTED) );
-    QString layerName = restoreState.getValue<QString>(Util::NAME);
+    m_state.setValue<bool>(SELECTED, restoreState.getValue<bool>(SELECTED) );
+    QString layerName = restoreState.getValue<QString>(LAYER_NAME);
     QString shortName = layerName;
     if ( !layerName.startsWith( GROUP )){
         DataLoader* dLoader = Util::findSingletonObject<DataLoader>();
         shortName = dLoader->getShortName( layerName );
     }
     m_state.setValue<QString>(Util::ID, restoreState.getValue<QString>(Util::ID));
-    m_state.setValue<QString>(Util::NAME, shortName);
+    m_state.setValue<QString>(LAYER_NAME, shortName);
 }
 
 
@@ -236,7 +224,7 @@ bool Layer::_setCompositionMode( const QString& id, const QString& /*composition
 bool Layer::_setLayerName( const QString& id, const QString& name ){
     bool nameChanged = false;
     if ( id == _getLayerId() ){
-        m_state.setValue<QString>( Util::NAME, name);
+        m_state.setValue<QString>( LAYER_NAME, name);
         nameChanged = true;
     }
     return nameChanged;
@@ -252,9 +240,9 @@ bool Layer::_setSelected( QStringList& names ){
         names.removeAt( layerIndex );
     }
 
-    bool oldSelected = m_state.getValue<bool>(Util::SELECTED );
+    bool oldSelected = m_state.getValue<bool>(SELECTED );
     if ( oldSelected != selected ){
-        m_state.setValue<bool>( Util::SELECTED, selected );
+        m_state.setValue<bool>( SELECTED, selected );
         stateChanged = true;
     }
     return stateChanged;

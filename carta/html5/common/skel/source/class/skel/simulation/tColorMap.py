@@ -28,7 +28,6 @@ class tColorMap(unittest.TestCase):
         driver.execute_script( "arguments[0].scrollIntoView(true);", colorMapCombo )
         colorMapText = colorMapCombo.find_element_by_xpath( ".//div/div")
         mapName = colorMapText.text
-        ActionChains(driver).click( colorMapCombo ).perform()
         return mapName
     
     def _chooseNewColorMap(self, driver ):
@@ -39,38 +38,6 @@ class tColorMap(unittest.TestCase):
                 ).send_keys( Keys.ENTER).perform()
         time.sleep( timeout )
         
-    
-    # This was written in response to issue #180.  Change the units in the color bar with a 2D
-    # image produced a crash.
-    def test_unitChange(self):    
-        driver = self.driver
-        timeout = selectBrowser._getSleep()
-        
-        #Load a 2D image
-        Util.load_image( self, driver, "aH.fits")
-        
-        #Get the old units
-        unitCombo = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "colorImageUnits")))
-        driver.execute_script( "arguments[0].scrollIntoView(true);", unitCombo )
-        unitText = unitCombo.find_element_by_xpath( ".//div/div")
-        oldUnits = unitText.text
-        print "Old units=", oldUnits
-        
-        #Change the units
-        ActionChains(driver).click(unitCombo).send_keys( Keys.ARROW_DOWN).send_keys( Keys.ARROW_DOWN
-                ).send_keys( Keys.ENTER).perform()
-        time.sleep( timeout )
-        
-        #Verify the units are changed.
-        unitCombo = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "colorImageUnits")))
-        driver.execute_script( "arguments[0].scrollIntoView(true);", unitCombo )
-        unitText = unitCombo.find_element_by_xpath( ".//div/div")
-        newUnits = unitText.text
-        print "New units=",newUnits
-        self.assertTrue( newUnits != oldUnits, "Color map units did not change")
-        
-        
-    
         
     # Load 3 images and check that if we change the color map of one of them,
     # all three of them are changed.
@@ -118,7 +85,10 @@ class tColorMap(unittest.TestCase):
         Util.load_image( self, driver, image1 )
         Util.load_image( self, driver, image2 )
         Util.load_image( self, driver, image3 )
-        time.sleep(4)
+        
+        #Store the old colormap
+        oldMapName = self._getColorMapName( driver )
+        print "Old map name=",oldMapName
         
         #Open the stack tab
         Util.openSettings( self, driver, "Image", True )
@@ -138,23 +108,19 @@ class tColorMap(unittest.TestCase):
         Util.clickTab( driver, "Color Map")
         time.sleep( timeout );
         
-         #Store the old colormap
-        oldMapName = self._getColorMapName( driver )
-        print "Old map name=",oldMapName
-        
         #Uncheck using a global color map
         globalCheck = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "colorMapGlobal")))
-        ActionChains(driver).move_to_element( globalCheck).click().perform()
+        driver.execute_script( "arguments[0].scrollIntoView(true);", globalCheck)
+        ActionChains(driver).click( globalCheck ).perform()
         
         #Choose a new color map
         self._chooseNewColorMap( driver )
         newMapName = self._getColorMapName( driver )
         print "New map name=", newMapName
         self.assertTrue( oldMapName != newMapName, "Color map name did not change")
-    
+        
         #Change back to auto select so that the color map changes as we animate
         ActionChains(driver).click( autoSelectCheck ).perform()
-        time.sleep( timeout )
         
         #Animate through images.  Make sure the first and second ones are using the old map 
         #and the third is not
@@ -163,7 +129,6 @@ class tColorMap(unittest.TestCase):
         imageMapName = self._getColorMapName( driver )
         print "Image 1 name=",imageMapName
         self.assertTrue( imageMapName == oldMapName, "Color map name 1 incorrect")
-        
         self._nextImage( driver )
         time.sleep( timeout )
         imageMapName = self._getColorMapName( driver )

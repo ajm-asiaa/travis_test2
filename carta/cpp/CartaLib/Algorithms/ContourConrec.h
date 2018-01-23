@@ -23,15 +23,6 @@ class ContourConrec
 {
 public:
 
-    enum class ContourMode
-    {
-        ORIGINAL,
-        GAUSSIANBLUR_3,
-        GAUSSIANBLUR_5,
-        BOXBLUR_3,
-        BOXBLUR_5
-    };
-
     /// the result of the algorithm is a list of contour sets for each requested
     /// level. Each contour set is in turn a list of poly-lines.
     typedef std::vector < std::vector < QPolygonF > > Result;
@@ -45,7 +36,7 @@ public:
 
     /// compute and return the sorted vertices
     Result
-    compute( NdArray::RawViewInterface *, QString typeName );
+    compute( NdArray::RawViewInterface * );
 
 private:
 

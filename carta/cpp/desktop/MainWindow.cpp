@@ -8,14 +8,12 @@
 #include <QtWebKitWidgets>
 #include <iostream>
 #include <QWebInspector>
-#include <qglobal.h>
 
 MainWindow::MainWindow( )
 {
     m_progress = 0;
 
     QNetworkProxyFactory::setUseSystemConfiguration(true);
-    setUnifiedTitleAndToolBarOnMac(true);
 
     m_view = new QWebView(this);
     connect(m_view, SIGNAL(loadFinished(bool)), SLOT(adjustLocation()));
@@ -38,39 +36,9 @@ MainWindow::MainWindow( )
     m_inspector-> setPage( m_view-> page());
     m_inspector-> resize( 800, 600);
 
-#ifdef Q_OS_LINUX
-    // add Carta option
-    QMenu *cartaMenu = menuBar()->addMenu(tr("&CARTA"));
-    cartaMenu->addAction(tr("Copyright and License"), this, SLOT(cartaLicense()));
-    cartaMenu->addAction(tr("Version 0.9"));
-#else
-    // add Carta option
-    QMenu *cartaMenu = menuBar()->addMenu(tr("&CARTA"));
-    //cartaMenu->addAction(tr("&About"), this, SLOT(cartaLicense()));
-
-    QAction *aboutCopyright = new QAction(tr("Copyright and License"), this);
-    connect(aboutCopyright, SIGNAL(triggered()), this, SLOT(cartaLicense()));
-    aboutCopyright->setMenuRole(QAction::ApplicationSpecificRole);
-    cartaMenu->addAction(aboutCopyright);
-
-    QAction *aboutVersion = new QAction(tr("Version 0.9"), this);
-    aboutVersion->setMenuRole(QAction::ApplicationSpecificRole);
-    cartaMenu->addAction(aboutVersion);
-#endif
-
-    // add Tool option
     QMenu *toolsMenu = menuBar()->addMenu(tr("&Tools"));
     toolsMenu->addAction(tr("Show JS Console"), this, SLOT(showJsConsole()));
 
-    // add Help option
-    QMenu *helpMenu = menuBar()->addMenu(tr("&Help"));
-    helpMenu->addAction(tr("GitHub Home"), this, SLOT(helpUrlGitHubHome()));
-    helpMenu->addAction(tr("GitHub Wiki"), this, SLOT(helpUrlGitHubWiki()));
-    helpMenu->addAction(tr("GitHub Issues"), this, SLOT(helpUrlGitHubIssues()));
-    helpMenu->addAction(tr("Release"), this, SLOT(helpReleaseNote()));
-    helpMenu->addAction(tr("Manual"), this, SLOT(helpManual()));
-    helpMenu->addAction(tr("Helpdesk"), this, SLOT(helpUrlHelpdesk()));
-    
     setCentralWidget(m_view);
     setUnifiedTitleAndToolBarOnMac(true);
 
@@ -78,11 +46,12 @@ MainWindow::MainWindow( )
              & QWebFrame::javaScriptWindowObjectCleared,
              this,
              & MainWindow::addToJavaScript );
-
-    // set visibilities of window bars
-    menuBar()->setVisible( true);
-    toolBar->setVisible( false);
-    statusBar()->setVisible( true);
+    bool qtDecorationsEnabled = Globals::instance()->mainConfig()->isDeveloperDecorations();
+    if( !qtDecorationsEnabled ) {
+        menuBar()->setVisible( false);
+        toolBar->setVisible( false);
+        statusBar()->setVisible( false);
+    }
 
     // install 'fileq' protocol handler
     m_view->page()->setNetworkAccessManager( new Carta::Desktop::NetworkAccessManager(this));
@@ -147,52 +116,4 @@ void MainWindow::addToJavaScript()
         m_view->page()->mainFrame()->addToJavaScriptWindowObject(
                     entry.first, entry.second);
     }
-}
-
-void MainWindow::helpUrlGitHubHome()
-{
-    QDesktopServices::openUrl(QUrl("https://github.com/CARTAvis/carta", QUrl::TolerantMode));
-}
-
-void MainWindow::helpUrlGitHubWiki()
-{
-    QDesktopServices::openUrl(QUrl("https://github.com/CARTAvis/carta/wiki", QUrl::TolerantMode));
-}
-
-void MainWindow::helpUrlGitHubIssues()
-{
-    QDesktopServices::openUrl(QUrl("https://github.com/CARTAvis/carta/issues", QUrl::TolerantMode));
-}
-
-void MainWindow::helpReleaseNote()
-{
-    QDesktopServices::openUrl(QUrl("https://github.com/CARTAvis/carta/releases", QUrl::TolerantMode));
-}
-
-void MainWindow::helpManual()
-{
-    QDesktopServices::openUrl(QUrl("https://cartavis.github.io/manual/", QUrl::TolerantMode));
-}
-
-void MainWindow::helpUrlHelpdesk()
-{
-    QDesktopServices::openUrl(QUrl("mailto:carta_helpdesk@asiaa.sinica.edu.tw", QUrl::TolerantMode));
-}
-
-void MainWindow::cartaLicense()
-{
-    QMessageBox::about(this, tr("Copyright and License"),
-                 tr("<p>This program is free software: you can redistribute it and/or modify \
-                    it under the terms of the GNU General Public License as published by \
-                    the Free Software Foundation, either version 3 of the License, or \
-                    (at your option) any later version.</p>\
-                    <p>This program is distributed in the hope that it will be useful, \
-                    but WITHOUT ANY WARRANTY; without even the implied warranty of \
-                    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the \
-                    GNU General Public License for more details.</p>\
-                    <p>You should have received a copy of the GNU General Public License \
-                    along with this program.  If not, see \
-                    <a href='http://www.gnu.org/licenses/'>http://www.gnu.org/licenses/<a>.</p> \
-                    <p>Third party list: <a href='https://github.com/cartavis/carta#third-party-libraries'>\
-                    https://github.com/cartavis/carta#third-party-libraries<a>.</p>"));
 }

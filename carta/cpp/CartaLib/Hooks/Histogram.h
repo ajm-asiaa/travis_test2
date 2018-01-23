@@ -18,9 +18,6 @@ namespace Lib
 namespace Image {
 class ImageInterface;
 }
-namespace Regions {
-	class RegionBase;
-}
 namespace Hooks
 {
 class HistogramHook : public BaseHook
@@ -41,8 +38,7 @@ public:
 
             Params( std::shared_ptr<Image::ImageInterface> p_dataSource,
                     int p_binCount, int p_minChannel, int p_maxChannel, double p_minFrequency, double p_maxFrequency,
-                    const QString& p_rangeUnits, double p_minIntensity, double p_maxIntensity,
-					std::shared_ptr<Carta::Lib::Regions::RegionBase> p_region, const QString& p_regionId ){
+                    const QString& p_rangeUnits, double p_minIntensity, double p_maxIntensity){
                 dataSource = p_dataSource;
                 binCount = p_binCount;
                 minChannel = p_minChannel;
@@ -52,8 +48,6 @@ public:
                 minFrequency = p_minFrequency;
                 maxFrequency = p_maxFrequency;
                 rangeUnits = p_rangeUnits;
-                region = p_region;
-                regionId = p_regionId;
             }
 
             std::shared_ptr<Image::ImageInterface> dataSource;
@@ -65,8 +59,6 @@ public:
             double minFrequency;
             double maxFrequency;
             QString rangeUnits;
-            QString regionId;
-            std::shared_ptr<Carta::Lib::Regions::RegionBase> region;
         };
 
     /**

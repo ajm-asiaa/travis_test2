@@ -1,6 +1,0 @@
-/**
- *
- **/
-
-#include "CoordSystemHook.h"
-

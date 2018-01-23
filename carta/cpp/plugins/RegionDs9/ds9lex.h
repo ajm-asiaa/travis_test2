@@ -15,7 +15,7 @@
 
 #ifndef __FLEX_LEXER_H
 #define yyFlexLexer ds9lex_FlexLexer
-#include <ds9FlexLexer.h>
+#include <FlexLexer.h>
 #undef yyFlexLexer
 #endif
 

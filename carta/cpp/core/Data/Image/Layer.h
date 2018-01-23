@@ -9,10 +9,9 @@
 #include "CartaLib/IImage.h"
 #include "CartaLib/AxisInfo.h"
 #include "CartaLib/AxisLabelInfo.h"
-#include "CartaLib/IntensityUnitConverter.h"
 #include "CartaLib/VectorGraphics/VGList.h"
-#include "Data/Image/Render/RenderRequest.h"
-#include "Data/Image/Render/RenderResponse.h"
+#include "Data/Image/RenderRequest.h"
+#include "Data/Image/RenderResponse.h"
 #include <QImage>
 #include <QStack>
 #include <set>
@@ -40,11 +39,8 @@ class LayerCompositionModes;
 class Layer : public QObject, public Carta::State::CartaObject {
 
     friend class Controller;
-    friend class CurveData;
     friend class LayerGroup;
     friend class Profiler;
-    friend class ProfileRenderService;
-    friend class ProfileRenderRequest;
     friend class Stack;
     friend class DrawGroupSynchronizer;
     friend class DrawStackSynchronizer;
@@ -63,9 +59,9 @@ public:
 
 
 signals:
-    void contourSetRemoved( const QString& name );
-    void contourSetAdded(Layer* data, const QString& name );
-    void colorStateChanged();
+    virtual void contourSetRemoved( const QString& name );
+    virtual void contourSetAdded(Layer* data, const QString& name );
+    virtual void colorStateChanged();
 
 
     //Notification that a new image has been produced.
@@ -114,7 +110,6 @@ protected:
     virtual Carta::Lib::AxisInfo::KnownType _getAxisYType() const = 0;
     virtual std::vector<Carta::Lib::AxisInfo::KnownType> _getAxisZTypes() const = 0;
     virtual std::vector<Carta::Lib::AxisInfo::KnownType> _getAxisTypes() const = 0;
-    virtual std::vector<Carta::Lib::AxisInfo> _getAxisInfos() const = 0;
 
     virtual QPointF _getCenterPixel() const = 0;
 
@@ -135,16 +130,6 @@ protected:
      * @return - a string identifier for the composition mode.
      */
     virtual QString _getCompositionMode() const;
-
-    /**
-     * Return the point on the image corresponding to the pixel point in the context
-     * view.
-     * @param pixelPt - a pixel position in the context view.
-     * @param outputSize - the size of the context view in pixels.
-     * @param valid - whether or not the returned point is valid.
-     * @return - the pixel position of the point in image coordinates.
-     */
-    virtual QPointF _getContextPt( const QPointF& pixelPt, const QSize& outputSize, bool* valid ) const = 0;
 
     /**
      * Return the contour set with the indicated name.
@@ -181,11 +166,10 @@ protected:
      * @param mouseX the mouse x-position in screen coordinates.
      * @param mouseY the mouse y-position in screen coordinates.
      * @param frames - list of image frames.
-     * @param outputSize - the size of the image in pixels.
      * @return a QString containing cursor text.
      */
-    virtual QString _getCursorText(bool isAutoClip, double minPercent, double maxPercent, int mouseX, int mouseY,
-            const std::vector<int>& frames, const QSize& outputSize ) = 0;
+    virtual QString _getCursorText( int mouseX, int mouseY,
+            const std::vector<int>& frames ) = 0;
 
 
     /**
@@ -208,14 +192,6 @@ protected:
      */
     virtual int _getDimension() const = 0;
 
-    /**
-     * Return the dimensions of the displayed image; normally, this will
-     * be the number of frames in the RA x DEC directions.  However, if
-     * the image is being display as a Frequency x DEC plot, this will be
-     * the number of frames in the frequency & DEC axes.
-     * @return - the displayed dimensions of the image.
-     */
-    virtual QSize _getDisplaySize() const = 0;
 
     /**
      * Return the number of frames for the given axis in the image.
@@ -247,49 +223,28 @@ protected:
      * Returns the location on the image corresponding to a screen point in
      * pixels.
      * @param screenPt an (x,y) pair of pixel coordinates.
-     * @param outputSize - the size in pixels of the output image.
      * @param valid set to true if an image is loaded that can do the translation; otherwise false;
      * @return the corresponding location on the image.
      */
-    virtual QPointF _getImagePt( const QPointF& screenPt, const QSize& outputSize, bool* valid ) const = 0;
-
-
-    /**
-     * Return the portion of the image that is displayed given current zoom and
-     * pan values.
-     * @param size - the size of the displayed image.
-     * @return - the portion of the image that is visible.
-     */
-    virtual QRectF _getInputRect( const QSize& size ) const = 0;
-
+    virtual QPointF _getImagePt( QPointF screenPt, bool* valid ) const = 0;
 
     /**
      * Returns the intensity corresponding to a given percentile.
      * @param frameLow - a lower bound for the image frames or -1 if there is no lower bound.
      * @param frameHigh - an upper bound for the image frames or -1 if there is no upper bound.
-     * @param percentiles - a list of numbers in [0,1] for which an intensity is desired.
-     * @param stokeFrame - the index number of stoke slice
-     * @return - a list of intensity values.
+     * @param percentile - a number [0,1] for which an intensity is desired.
+     * @param intensity - the computed intensity corresponding to the percentile.
+     * @param intensityIndex - the frame where maximum intensity was found.
+     * @return true if the computed intensity is valid; otherwise false.
      */
-    virtual std::vector<double> _getIntensity( int frameLow, int frameHigh,
-            const std::vector<double>& percentiles, int stokeFrame,
-            Carta::Lib::IntensityUnitConverter::SharedPtr converter) const = 0;
+    virtual bool _getIntensity( int frameLow, int frameHigh, double percentile,
+            double* intensity, int* intensityIndex ) const = 0;
 
     /**
-     * Returns whether or not the layer can be loaded with the indicated frames.
-     * @param frames - list of frame indices to load.
-     * @return - whether or not the layer can be loaded with the indicated frames.
-     */
-    virtual bool _isLoadable( const std::vector<int>& frames ) const;
-
-
-    /**
-     * Return the layer with the given name, if a name is specified; otherwise, return the current
-     * layer.
-     * @name - the name of a layer or an empty string to specify the current layer.
+     * Return the current layer.
      * @return - the current layer.
      */
-    virtual std::shared_ptr<Layer> _getLayer( const QString& name );
+    virtual std::shared_ptr<Layer> _getLayer();
 
     /**
      * Return all layers containing images.
@@ -323,34 +278,29 @@ protected:
 
 
     /**
-     * Return percentiles corresponding to the given intensities.
-     * @param frameLow a lower bound for the channel range or -1 if there is no lower bound.
-     * @param frameHigh an upper bound for the channel range or -1 if there is no upper bound.
-     * @param intensities values for which percentiles are needed.
-     * @return the percentiles corresponding to the intensities.
+     * Get the dimensions of the image viewer (window size).
+     * @return the image viewer dimensions.
      */
-    virtual std::vector<double> _getPercentiles( int frameLow, int frameHigh, std::vector<double> intensities, Carta::Lib::IntensityUnitConverter::SharedPtr converter ) const = 0;
+    virtual QSize _getOutputSize() const = 0;
+
+    /**
+     * Return the percentile corresponding to the given intensity.
+     * @param frameLow a lower bound for the frame index or -1 if there is no lower bound.
+     * @param frameHigh an upper bound for the frame index or -1 if there is no upper bound.
+     * @param intensity a value for which a percentile is needed.
+     * @return the percentile corresponding to the intensity.
+     */
+    virtual double _getPercentile( int frameLow, int frameHigh, double intensity ) const = 0;
 
 
     /**
      * Return the pixel coordinates corresponding to the given world coordinates.
      * @param ra the right ascension (in radians) of the world coordinates.
      * @param dec the declination (in radians) of the world coordinates.
-     * @param valid - true if the coordinates are valid; false, otherwise.
-     * @return - a point containing the pixel coordinates.
+     * @return a list consisting of the x- and y-coordinates of the pixel
+     *  corresponding to the given world coordinates.
      */
-    virtual QPointF _getPixelCoordinates( double ra, double dec, bool* valid ) const = 0;
-
-    /**
-     * Return the world coordinates corresponding to the given pixel coordinates.
-     * @param pixelX - the first pixel coordinate.
-     * @param pixelY - the second pixel coordinate.
-     * @param coordSys - the coordinate system.
-     * @param valid - true if the pixel coordinates are valid; false otherwise.
-     * @return - a point containing the pixel coordinates.
-     */
-    virtual QPointF _getWorldCoordinates( double ra, double dec,
-            Carta::Lib::KnownSkyCS coordSys, bool* valid ) const = 0;
+    virtual QStringList _getPixelCoordinates( double ra, double dec ) const = 0;
 
     /**
      * Return the units of the pixels.
@@ -371,19 +321,6 @@ protected:
     virtual QString _getPixelValue( double x, double y, const std::vector<int>& frames ) const = 0;
 
     /**
-     * Return the graphics for drawing regions.
-     * @return - a list of graphics for drawing regions.
-     */
-    virtual Carta::Lib::VectorGraphics::VGList _getRegionGraphics() const = 0;
-
-    /**
-     * Return the rest frequency and units for the image.
-     * @return - the image rest frequency and units; a blank string and a negative
-     * 		value are returned with the rest frequency can not be found.
-     */
-    virtual std::pair<double,QString> _getRestFrequency() const = 0;
-
-    /**
      * Return the size of the saved image based on the user defined output size and the aspect
      * ratio mode.
      * @param outputSize - the output image size specified by the user.
@@ -391,6 +328,14 @@ protected:
      * @return - the size of the saved image.
      */
     virtual QSize _getSaveSize( const QSize& outputSize,  Qt::AspectRatioMode aspectMode) const = 0;
+
+    /**
+     * Returns the location on the screen corresponding to a location in image coordinates.
+     * @param imagePt an (x,y) pair of image coordinates.
+     * @param valid set to true if an image is loaded that can do the translation; otherwise false;
+     * @return the corresponding pixel coordinates.
+     */
+    virtual QPointF _getScreenPt( QPointF imagePt, bool* valid ) const = 0;
 
     /**
      * Return the color states that are eligible for state changes.
@@ -444,12 +389,6 @@ protected:
      */
     virtual bool _isEmpty() const;
 
-    /**
-     * Returns whether the layer is diaplayed on the celestial (RA-DEC) plane
-     * @param includelinear - true when consider LINEAR-LINEAR plane
-     * as another type of celestial plane.
-     */
-    virtual bool _isOnCelestialPlane( bool includelinear = 1 ) const;
 
     /**
      * Returns true if this data is selected; false otherwise.
@@ -458,10 +397,14 @@ protected:
     bool _isSelected() const;
 
     /**
-     * Returns whether or not the layered images have spectral axes.
-     * @return - true if the layered images all have spectral axes; false, otherwise.
+     * Return a QImage representation of this data.
+     * @param frames - a list of frames to load, one for each of the known axis types.
+     * @param autoClip true if clips should be automatically generated; false otherwise.
+     * @param clipMinPercentile the minimum clip value.
+     * @param clipMaxPercentile the maximum clip value.
      */
-    virtual bool _isSpectralAxis() const;
+    virtual void _load( std::vector<int> frames, bool autoClip, double clipMinPercentile,
+            double clipMaxPercentile ) = 0;
 
     /**
      * Remove the contour set from this layer.
@@ -525,7 +468,6 @@ protected:
      */
     virtual QString _setFileName( const QString& fileName, bool* success );
 
-    virtual QString _getFileName();
 
     /**
      * Give the layer (a more user-friendly) name.
@@ -535,14 +477,7 @@ protected:
      *      in and the name was successfully reset; false otherwise.
      */
     virtual bool _setLayerName( const QString& id, const QString& name );
-
-    /**
-     * Group or ungroup any child layers.
-     * @param grouped - true if child layers should be grouped; false, otherwise.
-     * @param viewSize - the view size.
-     * @return - true if the operation was performed; false otherwise.
-     */
-    virtual bool _setLayersGrouped( bool grouped, const QSize& viewSize ) = 0;
+    virtual bool _setLayersGrouped( bool grouped ) = 0;
 
     /**
      * Set the color to use for the mask.
@@ -583,11 +518,6 @@ protected:
      */
     virtual void _setPan( double imgX, double imgY ) = 0;
 
-    /**
-     * Set a list of graphics for drawing the current regions.
-     * @param regionVGList - graphics for drawing the current regions.
-     */
-    virtual void _setRegionGraphics( const Carta::Lib::VectorGraphics::VGList& regionVGList ) = 0;
 
     /**
      * Set this data source selected.
@@ -617,15 +547,25 @@ protected:
 
     virtual void _updateColor();
 
+    /**
+     * Reset the view to its previous state after a save.
+     */
+    virtual void _viewReset() = 0;
 
+    /**
+     * Resize the view of the image.
+     */
+    virtual void _viewResize( const QSize& newSize ) = 0;
 
     /**
      *  Constructor.
      */
     Layer( const QString& className, const QString& path, const QString& id );
 
+    static const QString LAYER_NAME;
     static const QString GROUP;
     static const QString LAYER;
+    static const QString SELECTED;
 
     bool m_renderQueued;
 

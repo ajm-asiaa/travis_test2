@@ -849,15 +849,7 @@ QStringList ScriptFacade::getPixelCoordinates( const QString& controlId, double 
     if ( obj != nullptr ){
         Carta::Data::Controller* controller = dynamic_cast<Carta::Data::Controller*>(obj);
         if ( controller != nullptr ){
-            bool valid = false;
-            QPointF coords=controller->getPixelCoordinates( ra, dec, &valid );
-            if ( valid ){
-                resultList.append( QString::number(coords.x()));
-                resultList.append( QString::number(coords.y()));
-            }
-            else {
-                resultList = _logErrorMessage( ERROR, UNKNOWN_ERROR );
-            }
+            resultList = controller->getPixelCoordinates( ra, dec );
         }
         else {
             resultList = _logErrorMessage( ERROR, UNKNOWN_ERROR );
@@ -1296,17 +1288,18 @@ QStringList ScriptFacade::applyClips( const QString& histogramId ) {
     return resultList;
 }
 
-QStringList ScriptFacade::getIntensity( const QString& controlId, int frameLow,
-        int frameHigh, double percentile ) {
+QStringList ScriptFacade::getIntensity( const QString& controlId, int frameLow, int frameHigh, double percentile ) {
     QStringList resultList;
+    double intensity;
+    bool valid;
     Carta::State::CartaObject* obj = _getObject( controlId );
     if ( obj != nullptr ){
         Carta::Data::Controller* controller = dynamic_cast<Carta::Data::Controller*>(obj);
         if ( controller != nullptr ){
-            std::vector<double> intensities = controller->getIntensity(
-                    frameLow, frameHigh, {percentile} );
-            if ( intensities.size() == 1 ){
-                resultList = QStringList( QString::number( intensities[0] ) );
+            int index = 0;
+            valid = controller->getIntensity( frameLow, frameHigh, percentile, &intensity, &index );
+            if ( valid ) {
+                resultList = QStringList( QString::number( intensity ) );
             }
             else {
                 resultList = _logErrorMessage( ERROR, "Could not get intensity for the specified parameters." );

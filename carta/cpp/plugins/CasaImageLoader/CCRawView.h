@@ -8,7 +8,6 @@
 #include <casacore/lattices/Lattices/LatticeStepper.h>
 #include <casacore/lattices/Lattices/LatticeIterator.h>
 #include <casacore/casa/Arrays/IPosition.h>
-#include <algorithm>
 
 template < typename PType >
 class CCImage;
@@ -196,7 +195,7 @@ CCRawView < PType >::get( const Carta::Lib::NdArray::RawViewInterface::VI & pos 
                        + p * m_appliedSlice.dims()[i].step;
     }
 
-    // casacore::ImageInterface::operator() returns the result by value
+    // casa::ImageInterface::operator() returns the result by value
     // so in order to return reference (to satisfy our API) we need to store this
     // in a buffer first...
     m_buff = m_ccimage-> m_casaII->
@@ -220,38 +219,37 @@ CCRawView < PType >::forEach(
 
 //    qDebug() << "CCRawView::forEach=" << m_appliedSlice.toStr()  ;
 
-    // set the cursor shape to load partial file at each step
-    casacore::IPosition cursorShape( imgDims );
-    auto shapeVec = imageShape.asVector();
-    for(auto i=0; i<imgDims; i++){
-        // Restrict the maximum size in one dim to 16
-        // (The number is given arbitarily. Maybe it can be changed in the future)
-        cursorShape(i) = std::min( shapeVec(i), 16);
-        if ( i == 0 || i == 1 ){
-            // The first two dims are used as the dims of qimage in ImageRenderService
-            // To keep the rendering working, the sizes of the two dims cannot be changed so far.
-            cursorShape(i) = shapeVec(i);
-        }
-    }
-
-    casacore::LatticeStepper stepper( imageShape, cursorShape, casacore::LatticeStepper::RESIZE );
-    casacore::IPosition blc( imgDims, 0 );
+    /// \todo I guessed wrong as to what the cursor shape meant when using subSection()
+    /// \todo the shape refers to the shape within the subsection... so there is no need
+    /// \todo to specify cursor shape to be the whole image, it should instead be
+    /// \todo the shape of the subsection... e.g. [3:7:2,5:6] only needs a cursor
+    /// of size 2x1(x1x1x1....x1) regardless of the image size...
+    auto cursorShape = imageShape;
+    casa::LatticeStepper stepper( imageShape, cursorShape, casa::LatticeStepper::RESIZE );
+    casa::IPosition blc( imgDims, 0 );
     auto trc = blc;
     auto inc = blc;
-    for ( int i = 0 ; i < imgDims ; i++ ) {
+    for ( size_t i = 0 ; i < imgDims ; i++ ) {
         const auto & slice1d = m_appliedSlice.dims()[i];
         blc( i ) = slice1d.start;
         trc( i ) = slice1d.end();
         inc( i ) = slice1d.step;
     }
     stepper.subSection( blc, trc, inc );
-    casacore::RO_LatticeIterator < PType > iterator( * casaII, stepper );
+    casa::RO_LatticeIterator < PType > iterator( * casaII, stepper );
 
+    bool first = true;
     for ( iterator.reset() ; ! iterator.atEnd() ; iterator++ ) {
+        if ( ! first ) {
+            // sanity check for now, to make sure I understand casa cursors
+            // if this works, the outer loop is not necessary...
+            qFatal( "something went wrong" );
+        }
         const auto & cursor = iterator.cursor();
         for ( const auto & val : cursor ) {
             func( reinterpret_cast < const char * > ( & val ) );
         }
+        first = false;
     }
 } // forEach
 

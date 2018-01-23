@@ -23,9 +23,6 @@ class Layout : public QObject, public Carta::State::CartaObject {
     Q_OBJECT
 
 public:
-
-    using CartaObject::resetState;
-
     /**
      * Add a new window at the given position in the layout.
      * @param nodeId - a list of one or more window identifiers where the window should be added.
@@ -49,23 +46,13 @@ public:
      * Return a string representing the layout state.
      * @return a QString representing the corresponding layout state.
      */
-    QString getStateString( const QString& sessionId = "", SnapshotType type = SNAPSHOT_INFO ) const override;
-
-    bool isLayoutDefault() const;
+    QString getStateString() const;
 
     /**
      * Returns true if the layout is the standard analysis layout; false otherwise.
      * @return true if the layout is a standard analysis layout; false otherwise.
      */
     bool isLayoutAnalysis() const;
-
-    bool isLayoutImageComposite() const;
-
-    /**
-     * Returns true if the layout is the standard histogram analysis layout; false otherwise.
-     * @return true if the layout is a standard histogram analysis layout; false otherwise.
-     */
-    bool isLayoutHistogramAnalysis() const;
 
     /**
      * Returns true if the layout is the standard image layout; false otherwise.
@@ -78,10 +65,6 @@ public:
      * @param savedState the layout state that should be restored.
      */
     void resetState( const Carta::State::StateInterface& savedState );
-
-    void setLayoutDefault(bool cleanPluginList);
-
-    void setLayoutHistogramAnalysis();
 
     /**
      * Set a predefined analysis layout.
@@ -102,11 +85,6 @@ public:
      * Set a layout showing widgets currently under development.
      */
     void setLayoutDeveloper();
-
-    /**
-     * Set a predefined layout displaying only a single image and a imageZoom and a imageContxt
-     */
-    void setLayoutImageComposite();
 
     /**
      * Set a predefined layout displaying only a single image.
@@ -183,13 +161,8 @@ private:
     static const QString LAYOUT_PLUGINS;
     static const QString POSITION;
     static const QString TYPE_SELECTED;
-
     static const QString TYPE_IMAGE;
-    static const QString TYPE_IMAGECOMPOSITE;
-
-    static const QString TYPE_DEFAULT;
-    static const QString TYPE_ANALYSIS; // LineAnalysis, profiler
-    static const QString TYPE_HISTOGRAMANALYSIS;
+    static const QString TYPE_ANALYSIS;
     static const QString TYPE_CUSTOM;
     Layout( const Layout& other);
     Layout& operator=( const Layout& other );

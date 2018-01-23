@@ -37,23 +37,6 @@ qx.Class.define( "skel.boundWidgets.View.ViewWithInputDiv", {
         {
             return this.m_overlayWidget;
         },
-        
-        /**
-         * Set a custom overlay widget rather than using the
-         * generic one provided.
-         * @param widget {qx.ui.core.Widget} - a custom overlay widget.
-         */
-        setOverlayWidget : function( widget ){
-            if ( this.m_overlayWidget !== null ){
-                this.remove( this.m_overlayWidget );
-            }
-            this.m_overlayWidget = widget;
-            this.add( this.m_overlayWidget );
-        },
-        
-        setQuality : function( quality ){
-        	this.m_viewWidget.setQuality( quality );
-        },
 
         /**
          * Get the view widget

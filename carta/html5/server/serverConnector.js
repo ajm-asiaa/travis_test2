@@ -99,9 +99,6 @@
         if( quality < 1) {
             quality = 1;
         }
-        else if ( typeof( quality) == "undefined" ){
-        	quality = connector.supportsRasterViewQuality() ? 90 : 101;
-        }
         this.m_quality = quality;
         var params = {};
         // support for safari... (browsers that don't support binary format?)
@@ -407,7 +404,7 @@
         this.get = function()
         {
             // if we have don't have internal callback registered, re-read the value
-            if( !m_internalCallbackRegistered ) {
+            if( m_internalCallbackRegistered ) {
                 m_cachedValue = m_pwStateManager.getValue( m_path );
             }
             return m_cachedValue;

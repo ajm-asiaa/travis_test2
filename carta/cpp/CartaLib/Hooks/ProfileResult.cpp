@@ -1,6 +1,5 @@
 #include <CartaLib/Hooks/ProfileResult.h>
 #include <QDebug>
-#include <QtCore/QDataStream>
 
 namespace Carta {
   namespace Lib {

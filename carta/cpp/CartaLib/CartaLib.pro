@@ -16,8 +16,6 @@ SOURCES += \
     Hooks/ColormapsScalar.cpp \
     Hooks/ConversionIntensityHook.cpp \
     Hooks/ConversionSpectralHook.cpp \
-    Hooks/Fit1DHook.cpp \
-    Hooks/FitResult.cpp \
     Hooks/Histogram.cpp \
     Hooks/HistogramResult.cpp \
     Hooks/ProfileHook.cpp \
@@ -31,7 +29,6 @@ SOURCES += \
     AxisInfo.cpp \
     AxisLabelInfo.cpp \
     AxisDisplayInfo.cpp \
-    Fit1DInfo.cpp \
     ICoordinateFormatter.cpp \
     IPlotLabelGenerator.cpp \
     Hooks/LoadAstroImage.cpp \
@@ -47,18 +44,7 @@ SOURCES += \
     Algorithms/LineCombiner.cpp \
     IImageRenderService.cpp \
     IRemoteVGView.cpp \
-    IPCache.cpp \
-    Hooks/GetPersistentCache.cpp \
-    Hooks/GetProfileExtractor.cpp \
-    Regions/IRegion.cpp \
-    InputEvents.cpp \
-    Regions/ICoordSystem.cpp \
-    Hooks/CoordSystemHook.cpp \
-    Regions/CoordinateSystemFormatter.cpp \
-    Regions/Ellipse.cpp \
-    Regions/Point.cpp \
-    Regions/Rectangle.cpp \
-    IntensityUnitConverter.cpp
+    RegionInfo.cpp
 
 HEADERS += \
     CartaLib.h\
@@ -68,8 +54,6 @@ HEADERS += \
     Hooks/ColormapsScalar.h \
     Hooks/ConversionIntensityHook.h \
     Hooks/ConversionSpectralHook.h \
-    Hooks/Fit1DHook.h \
-    Hooks/FitResult.h \
     Hooks/Histogram.h \
     Hooks/HistogramResult.h \
     Hooks/ProfileHook.h \
@@ -86,7 +70,6 @@ HEADERS += \
     AxisInfo.h \
     AxisLabelInfo.h \
     AxisDisplayInfo.h \
-    Fit1DInfo.h \
     ICoordinateFormatter.h \
     IPlotLabelGenerator.h \
     Hooks/LoadAstroImage.h \
@@ -110,18 +93,7 @@ HEADERS += \
     IImageRenderService.h \
     Hooks/GetImageRenderService.h \
     IRemoteVGView.h \
-    Hooks/GetProfileExtractor.h \
-    Regions/IRegion.h \
-    InputEvents.h \
-    Regions/ICoordSystem.h \
-    Hooks/CoordSystemHook.h \
-    Regions/CoordinateSystemFormatter.h \
-    Hooks/GetPersistentCache.h \
-    Regions/Ellipse.h \
-    Regions/Point.h \
-    Regions/Rectangle.h \
-    IPCache.h \
-    IntensityUnitConverter.h
+    RegionInfo.h
 
 unix {
     target.path = /usr/lib

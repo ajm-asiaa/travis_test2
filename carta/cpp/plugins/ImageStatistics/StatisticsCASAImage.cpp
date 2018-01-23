@@ -13,71 +13,36 @@ StatisticsCASAImage::StatisticsCASAImage() {
 }
 
 
-std::vector<QString> StatisticsCASAImage::_beamAsStringVector( const casacore::GaussianBeam &beam ){
+std::vector<QString> StatisticsCASAImage::_beamAsStringVector( const casa::GaussianBeam &beam ){
     std::vector<QString> result;
     if (! beam.isNull()) {
         char buf[512];
-        //determine the precision of beam size dynamically 
-        if (beam.getMinor("arcsec") > 0.1 && beam.getMinor("arcsec") < 60.0){
-            sprintf( buf,"%.2f\"", beam.getMajor("arcsec") );
-            result.push_back(QString(buf));
-            sprintf( buf,"%.2f\"", beam.getMinor("arcsec") );
-            result.push_back(QString(buf));
-            //sprintf( buf,"%.2f%s", beam.getPA("deg", casacore::True), "\u00B0" );
-            //temporary solution to correctly display 'degree' char
-            sprintf( buf,"%.2fdeg", beam.getPA("deg", casacore::True) );
-            result.push_back(QString(buf));
-        }
-        if (beam.getMinor("arcsec") <= 0.1){
-            sprintf( buf,"%.3f\"", beam.getMajor("arcsec") );
-            result.push_back(QString(buf));
-            sprintf( buf,"%.3f\"", beam.getMinor("arcsec") );
-            result.push_back(QString(buf));
-            //sprintf( buf,"%.2f%s", beam.getPA("deg", casacore::True), "\u00B0" );
-            //temporary solution to correctly display 'degree' char
-            sprintf( buf,"%.2fdeg", beam.getPA("deg", casacore::True) );
-            result.push_back(QString(buf));
-        }
-        if (beam.getMinor("arcsec") <= 0.01){
-            sprintf( buf,"%.4f\"", beam.getMajor("arcsec") );
-            result.push_back(QString(buf));
-            sprintf( buf,"%.4f\"", beam.getMinor("arcsec") );
-            result.push_back(QString(buf));
-            //sprintf( buf,"%.2f%s", beam.getPA("deg", casacore::True), "\u00B0" );
-            //temporary solution to correctly display 'degree' char
-            sprintf( buf,"%.2fdeg", beam.getPA("deg", casacore::True) );
-            result.push_back(QString(buf));
-        }
-        if (beam.getMinor("arcsec") >= 60.0){
-            sprintf( buf,"%.2f\'", beam.getMajor("arcmin") );
-            result.push_back(QString(buf));
-            sprintf( buf,"%.2f\'", beam.getMinor("arcmin") );
-            result.push_back(QString(buf));
-            //sprintf( buf,"%.2f%s", beam.getPA("deg", casacore::True), "\u00B0" );
-            //temporary solution to correctly display 'degree' char
-            sprintf( buf,"%.2fdeg", beam.getPA("deg", casacore::True) );
-            result.push_back(QString(buf));
-        }
+        sprintf( buf,"%.2f\"", beam.getMajor("arcsec"));
+        result.push_back(QString(buf));
+        sprintf( buf,"%.2f\"", beam.getMinor("arcsec") );
+        result.push_back(QString(buf));
+        sprintf( buf,"%.2f%c", beam.getPA("deg", casa::True), 0x00B0 );
+        result.push_back(QString(buf));
     }
     return result;
 }
 
 
-bool StatisticsCASAImage::_beamCompare( const casacore::GaussianBeam &a, const casacore::GaussianBeam &b ) {
+bool StatisticsCASAImage::_beamCompare( const casa::GaussianBeam &a, const casa::GaussianBeam &b ) {
     return a.getArea("rad2") < b.getArea("rad2");
 }
 
 
-void StatisticsCASAImage::_computeStats(const casacore::ImageInterface<casacore::Float>* image,
+void StatisticsCASAImage::_computeStats(const casa::ImageInterface<casa::Float>* image,
         QList<Carta::Lib::StatInfo>& stats ){
-    casacore::Vector<casacore::Int> shapeVector = image->shape().asVector();
+    casa::Vector<casa::Int> shapeVector = image->shape().asVector();
     int dimCount = shapeVector.nelements();
     if (dimCount <= 0 ){
         return;
     }
     _insertShape( shapeVector, stats );
 
-    const casacore::CoordinateSystem cs = image->coordinates();
+    const casa::CoordinateSystem cs = image->coordinates();
     _insertRaDec( cs, shapeVector, stats );
 
     _insertSpectral( cs, shapeVector, stats );
@@ -86,7 +51,7 @@ void StatisticsCASAImage::_computeStats(const casacore::ImageInterface<casacore:
 }
 
 
-void StatisticsCASAImage::_getStatsPlanar( const casacore::ImageInterface<casacore::Float>* image,
+void StatisticsCASAImage::_getStatsPlanar( const casa::ImageInterface<casa::Float>* image,
         QList<Carta::Lib::StatInfo>& statsMap, int zIndex, int hIndex ) {
 
     try {
@@ -95,14 +60,14 @@ void StatisticsCASAImage::_getStatsPlanar( const casacore::ImageInterface<casaco
             return;
         }
 
-        const casacore::CoordinateSystem cs = image->coordinates();
+        const casa::CoordinateSystem cs = image->coordinates();
 
         int zAxis = -1;
         if ( cs.hasSpectralAxis() ){
             zAxis = cs.spectralAxisNumber();
         }
         else {
-            int tabIndex = cs.findCoordinate( casacore::Coordinate::TABULAR );
+            int tabIndex = cs.findCoordinate( casa::Coordinate::TABULAR );
             if ( tabIndex >= 0 ){
                 zAxis = tabIndex;
             }
@@ -115,33 +80,33 @@ void StatisticsCASAImage::_getStatsPlanar( const casacore::ImageInterface<casaco
         }
 
         //Get the axis names
-        casacore::Vector<casacore::String> axesNames = cs.worldAxisNames();
+        casa::Vector<casa::String> axesNames = cs.worldAxisNames();
         int nameCount = axesNames.size();
-        casacore::String zAxisName("");
+        casa::String zAxisName("");
         if ( zAxis >= 0 && zAxis < nameCount ){
             zAxisName = axesNames[zAxis];
         }
-        casacore::String hAxisName("");
+        casa::String hAxisName("");
         if ( hAxis >= 0 && hAxis < nameCount ){
             hAxisName = axesNames[hAxis ];
         }
 
-        casacore::String zUnit, zspKey, zspVal;
+        casa::String zUnit, zspKey, zspVal;
 
-        casacore::String unit =  image->units().getName();
+        casa::String unit =  image->units().getName();
 
         //Region Spectral Plane
-        casacore::Vector<casacore::Double> tWrld;
+        casa::Vector<casa::Double> tWrld;
 
-        casacore::String tStr;
-        casacore::Vector<casacore::Double>tPix = cs.referencePixel();
+        casa::String tStr;
+        casa::Vector<casa::Double>tPix = cs.referencePixel();
         int tPixSize = tPix.nelements();
         if (zIndex > -1 && zAxis >= 0 && zAxis < tPixSize ) {
             tPix(zAxis) = zIndex;
             if ( cs.toWorld( tWrld, tPix)){
-                casacore::String zLabel = cs.format(tStr, casacore::Coordinate::DEFAULT, tWrld(zAxis), zAxis,
+                casa::String zLabel = cs.format(tStr, casa::Coordinate::DEFAULT, tWrld(zAxis), zAxis,
                         true, true, -1, false);
-                casacore::String valueStr( zLabel + tStr );
+                casa::String valueStr( zLabel + tStr );
                 Carta::Lib::StatInfo info( Carta::Lib::StatInfo::StatType::Frequency );
                 info.setValue( valueStr.c_str() );
                 statsMap.append( info );
@@ -152,7 +117,7 @@ void StatisticsCASAImage::_getStatsPlanar( const casacore::ImageInterface<casaco
         if (hAxis > -1) {
             tPix(hAxis) = hIndex;
             if ( cs.toWorld( tWrld, tPix) ){
-                casacore::String hLabel = cs.format(tStr, casacore::Coordinate::DEFAULT, tWrld(hAxis), hAxis,
+                casa::String hLabel = cs.format(tStr, casa::Coordinate::DEFAULT, tWrld(hAxis), hAxis,
                         true, true, -1, false );
                 if ( hLabel != "" ){
                     Carta::Lib::StatInfo info( Carta::Lib::StatInfo::StatType::Stokes );
@@ -163,13 +128,13 @@ void StatisticsCASAImage::_getStatsPlanar( const casacore::ImageInterface<casaco
         }
 
         //Frequency & Velocity
-        casacore::Int spInd = cs.findCoordinate(casacore::Coordinate::SPECTRAL);
-        casacore::SpectralCoordinate spCoord;
+        casa::Int spInd = cs.findCoordinate(casa::Coordinate::SPECTRAL);
+        casa::SpectralCoordinate spCoord;
         if ( spInd>=0 ) {
             spCoord=cs.spectralCoordinate(spInd);
             spCoord.setVelocity();
-            casacore::Double vel;
-            casacore::Double restFreq = spCoord.restFrequency();
+            casa::Double vel;
+            casa::Double restFreq = spCoord.restFrequency();
             if (downcase(zAxisName).contains("freq")) {
                 Carta::Lib::StatInfo info( Carta::Lib::StatInfo::StatType::Velocity );
                 if (restFreq >0 && spCoord.pixelToVelocity(vel, zIndex)) {
@@ -192,20 +157,20 @@ void StatisticsCASAImage::_getStatsPlanar( const casacore::ImageInterface<casaco
         info.setValue( unitval.c_str() );
         statsMap.append( info );
 
-        casacore::Double beamArea = 0;
-        casacore::ImageInfo ii = image->imageInfo();
-        casacore::GaussianBeam beam = ii.restoringBeam(zIndex);
+        casa::Double beamArea = 0;
+        casa::ImageInfo ii = image->imageInfo();
+        casa::GaussianBeam beam = ii.restoringBeam(zIndex);
         std::string imageUnits = image->units().getName();
         std::transform( imageUnits.begin(), imageUnits.end(), imageUnits.begin(), ::toupper );
 
-        casacore::Int afterCoord = -1;
-        casacore::Int dC = cs.findCoordinate(casacore::Coordinate::DIRECTION, afterCoord);
+        casa::Int afterCoord = -1;
+        casa::Int dC = cs.findCoordinate(casa::Coordinate::DIRECTION, afterCoord);
         if ( ! beam.isNull() && dC!=-1 && imageUnits.find("JY/BEAM") != std::string::npos ) {
-            casacore::DirectionCoordinate dCoord = cs.directionCoordinate(dC);
-            casacore::Vector<casacore::String> units(2);
+            casa::DirectionCoordinate dCoord = cs.directionCoordinate(dC);
+            casa::Vector<casa::String> units(2);
             units(0) = units(1) = "rad";
             dCoord.setWorldAxisUnits(units);
-            casacore::Vector<casacore::Double> deltas = dCoord.increment();
+            casa::Vector<casa::Double> deltas = dCoord.increment();
             double divisor = qAbs( deltas(0)* deltas(1));
             beamArea = beam.getArea("rad2") / divisor;
         }
@@ -216,14 +181,14 @@ void StatisticsCASAImage::_getStatsPlanar( const casacore::ImageInterface<casaco
             statsMap.append( info );
         }
     }
-    catch (const casacore::AipsError& err) {
+    catch (const casa::AipsError& err) {
         std::string errMsg_ = err.getMesg();
         qDebug() << "Error: "<<errMsg_.c_str();
     }
 }
 
 QList<Carta::Lib::StatInfo>
-StatisticsCASAImage::getStats( const casacore::ImageInterface<casacore::Float>* image ){
+StatisticsCASAImage::getStats( const casa::ImageInterface<casa::Float>* image ){
     QList<Carta::Lib::StatInfo> stats;
     if ( image ){
         Carta::Lib::StatInfo info( Carta::Lib::StatInfo::StatType::Name );
@@ -242,34 +207,34 @@ StatisticsCASAImage::getStats( const casacore::ImageInterface<casacore::Float>* 
 }
 
 
-void StatisticsCASAImage::_insertRaDec( const casacore::CoordinateSystem& cs,
-        casacore::Vector<casacore::Int>& shapeVector,
+void StatisticsCASAImage::_insertRaDec( const casa::CoordinateSystem& cs,
+        casa::Vector<casa::Int>& shapeVector,
         QList<Carta::Lib::StatInfo> & stats ){
     if ( cs.hasDirectionCoordinate( ) ) {
-        const casacore::DirectionCoordinate &direction = cs.directionCoordinate( );
-        casacore::String directionType = casacore::MDirection::showType(direction.directionType( ));
-        casacore::Vector<double> refval = direction.referenceValue( );
+        const casa::DirectionCoordinate &direction = cs.directionCoordinate( );
+        casa::String directionType = casa::MDirection::showType(direction.directionType( ));
+        casa::Vector<double> refval = direction.referenceValue( );
         if ( refval.size( ) == 2 ) {
-            casacore::Vector<int> direction_axes = cs.directionAxesNumbers( );
-            casacore::Vector<double> pix(direction_axes.size( ));
+            casa::Vector<int> direction_axes = cs.directionAxesNumbers( );
+            casa::Vector<double> pix(direction_axes.size( ));
             for ( unsigned int x=0; x < pix.size( ); ++x ){
                 pix[x] = 0;
             }
-            casacore::Vector<double> world (pix.size( ));
+            casa::Vector<double> world (pix.size( ));
             direction.toWorld(world,pix);
 
-            casacore::String units;
+            casa::String units;
             std::vector<QString> raStr;
-            raStr.push_back(direction.format( units, casacore::Coordinate::DEFAULT, world[0], 0, true, true ).c_str());
+            raStr.push_back(direction.format( units, casa::Coordinate::DEFAULT, world[0], 0, true, true ).c_str());
             std::vector<QString> decStr;
-            decStr.push_back(direction.format( units, casacore::Coordinate::DEFAULT, world[1], 1, true, true ).c_str());
+            decStr.push_back(direction.format( units, casa::Coordinate::DEFAULT, world[1], 1, true, true ).c_str());
 
             for ( unsigned int x=0; x < pix.size( ); ++x ){
                 pix[x] = shapeVector[direction_axes[x]];
             }
             direction.toWorld(world,pix);
-            raStr.push_back(direction.format( units, casacore::Coordinate::DEFAULT, world[0], 0, true, true ).c_str());
-            decStr.push_back(direction.format( units, casacore::Coordinate::DEFAULT, world[1], 1, true, true ).c_str());
+            raStr.push_back(direction.format( units, casa::Coordinate::DEFAULT, world[0], 0, true, true ).c_str());
+            decStr.push_back(direction.format( units, casa::Coordinate::DEFAULT, world[1], 1, true, true ).c_str());
 
             QString raRange = raStr[0] + ", " + raStr[1];
             QString decRange = decStr[0] + ", " + decStr[1];
@@ -288,10 +253,10 @@ void StatisticsCASAImage::_insertRaDec( const casacore::CoordinateSystem& cs,
     }
 }
 
-void StatisticsCASAImage::_insertRestoringBeam( const casacore::ImageInterface<casacore::Float>* image,
+void StatisticsCASAImage::_insertRestoringBeam( const casa::ImageInterface<casa::Float>* image,
         QList<Carta::Lib::StatInfo>& stats ){
-    casacore::ImageInfo imageInfo = image->imageInfo();
-   std::vector<casacore::GaussianBeam> restoringBeams;
+    casa::ImageInfo imageInfo = image->imageInfo();
+   std::vector<casa::GaussianBeam> restoringBeams;
    Carta::Lib::StatInfo::StatType beamType = Carta::Lib::StatInfo::StatType::MedianRestoringBeam;
    if ( imageInfo.hasBeam( ) ) {
        if ( imageInfo.hasMultipleBeams( ) ) {
@@ -313,7 +278,7 @@ void StatisticsCASAImage::_insertRestoringBeam( const casacore::ImageInterface<c
    }
 }
 
-void StatisticsCASAImage::_insertShape( const casacore::Vector<casacore::Int>& shapeVector,
+void StatisticsCASAImage::_insertShape( const casa::Vector<casa::Int>& shapeVector,
         QList<Carta::Lib::StatInfo>& stats ){
     QString shapeStr( "[");
     int dimCount = shapeVector.nelements();
@@ -329,11 +294,11 @@ void StatisticsCASAImage::_insertShape( const casacore::Vector<casacore::Int>& s
     stats.append( info );
 }
 
-void StatisticsCASAImage::_insertSpectral( const casacore::CoordinateSystem& cs,
-        casacore::Vector<casacore::Int>& shapeVector, QList<Carta::Lib::StatInfo>& stats ){
+void StatisticsCASAImage::_insertSpectral( const casa::CoordinateSystem& cs,
+        casa::Vector<casa::Int>& shapeVector, QList<Carta::Lib::StatInfo>& stats ){
     if ( cs.hasSpectralAxis( ) && shapeVector[cs.spectralAxisNumber( )] > 1 ) {
-        casacore::SpectralCoordinate spec = cs.spectralCoordinate( );
-        casacore::Vector<casacore::String> specUnitVec = spec.worldAxisUnits( );
+        casa::SpectralCoordinate spec = cs.spectralCoordinate( );
+        casa::Vector<casa::String> specUnitVec = spec.worldAxisUnits( );
         if ( specUnitVec(0) == "Hz" ){
             specUnitVec(0) = "GHz";
         }
@@ -384,13 +349,13 @@ void StatisticsCASAImage::_insertSpectral( const casacore::CoordinateSystem& cs,
 
 
 std::vector<QString>
-StatisticsCASAImage::_medianRestoringBeamAsStr( std::vector<casacore::GaussianBeam> beams){
+StatisticsCASAImage::_medianRestoringBeamAsStr( std::vector<casa::GaussianBeam> beams){
     std::vector<QString> result;
     if ( beams.size( ) == 1 ){
         result = _beamAsStringVector(beams[0]);
     }
     else if ( beams.size( ) > 1 ) {
-        std::vector<casacore::GaussianBeam> beamcopy(beams);
+        std::vector<casa::GaussianBeam> beamcopy(beams);
         size_t n = beamcopy.size( ) / 2;
         std::nth_element( beamcopy.begin( ), beamcopy.begin( )+n, beamcopy.end( ),
                 StatisticsCASAImage::_beamCompare );

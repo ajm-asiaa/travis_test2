@@ -12,26 +12,26 @@ qx.Class.define("skel.Command.Layout.CommandLayoutAnalysis", {
     construct : function() {
         var path = skel.widgets.Path.getInstance();
         var cmd = path.SEP_COMMAND + "setAnalysisLayout";
-        this.base( arguments, "LineAnalysis Layout", cmd);
+        this.base( arguments, "Analysis Layout", cmd);
         this.m_toolBarVisible = false;
         this.setValue( false );
         this.setToolTipText("Set a predefined layout optimized for analyzing an image.");
     },
-
+    
     members : {
-
+        
         doAction : function( vals, undoCB ){
             if ( this.m_active){
                 var path = skel.widgets.Path.getInstance();
                 this.sendCommand( path.BASE_PATH + path.VIEW_MANAGER, "", undoCB );
             }
-
+           
         },
-
+        
         getType : function(){
-            return skel.Command.Command.TYPE_BOOL;
+            return skel.Command.Command.TYPE_BUTTON;
         },
-
+        
         /**
          * Sets whether or not this command's action will be performed.
          * @param active {boolean} true if the action should be performed; false otherwise.
@@ -39,8 +39,8 @@ qx.Class.define("skel.Command.Layout.CommandLayoutAnalysis", {
         setActive : function( active ){
             this.m_active = active;
         },
-
+        
         m_active : true
-
+        
     }
 });

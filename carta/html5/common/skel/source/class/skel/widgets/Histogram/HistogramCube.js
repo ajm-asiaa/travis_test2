@@ -441,6 +441,7 @@ qx.Class.define("skel.widgets.Histogram.HistogramCube", {
         setPlaneRangeEnabled : function( valid ){
             this.m_rangeMinText.setEnabled( valid );
             this.m_rangeMaxText.setEnabled( valid );
+            this.m_planeRange.setEnabled( valid );
             this.m_unitCombo.setEnabled( valid );
         },
         
@@ -454,25 +455,20 @@ qx.Class.define("skel.widgets.Histogram.HistogramCube", {
             this.m_planeSingle.removeListenerById( this.m_planeSingleListenerId );
             this.m_planeChannel.removeListenerById( this.m_planeChannelListenerId );
             this.m_planeRange.removeListenerById( this.m_planeRangeListenerId );
-           
-            var planeMode = false;
             if ( mode == this.m_planeAll.getLabel()){
                 if ( !this.m_planeAll.getValue()){
                     this.m_planeAll.setValue( true );
                 }
-                
             }
             else if ( mode == this.m_planeSingle.getLabel()){
                 if ( !this.m_planeSingle.getValue()){
                     this.m_planeSingle.setValue( true );
                 }
-                
             }
-            else if ( mode == this.m_planeRange.getLabel()){          	
+            else if ( mode == this.m_planeRange.getLabel()){
                 if ( !this.m_planeRange.getValue()){
                     this.m_planeRange.setValue( true );
                 }
-                planeMode = true;
             }
             else if ( mode == this.m_planeChannel.getLabel()){
                 if ( !this.m_planeChannel.getValue()){
@@ -482,7 +478,6 @@ qx.Class.define("skel.widgets.Histogram.HistogramCube", {
             else {
                 console.log( "Unrecognized plane mode"+mode);
             }
-            this.setPlaneRangeEnabled( planeMode );
             this.m_planeAllListenerId = this.m_planeAll.addListener( skel.widgets.Path.CHANGE_VALUE, 
                     this._planeAllChanged, this );
             this.m_planeSingleListenerId = this.m_planeSingle.addListener( skel.widgets.Path.CHANGE_VALUE, 

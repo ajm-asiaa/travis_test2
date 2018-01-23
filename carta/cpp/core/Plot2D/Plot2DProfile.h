@@ -42,23 +42,12 @@ public:
     virtual void detachFromPlot() Q_DECL_OVERRIDE;
 
     /**
-     * Returns the data point closest to the target point.
-     * @param targetX - the x-coordinate of the target point.
-     * @param targetY - the y-coordinate of the target point.
-     * @param xError - set to the error in the x-direction.
-     * @param yError - set to the error in the y-direction.
-     * @return - the data point closest to the target point.
-     */
-    virtual std::pair<double,double> getClosestPoint( double targetX, double targetY,
-            double* xError, double* yError ) const Q_DECL_OVERRIDE;
-
-    /**
      * Return a custom icon to use for the legend item.
      * @param index - unused.
      * @param size - the size of the icon.
      * @return - a custom icon for the legend item.
      */
-    virtual QwtGraphic legendIcon( int index, const QSizeF& size ) const Q_DECL_OVERRIDE;
+    virtual QwtGraphic legendIcon( int index, const QSizeF& size ) const;
 
     /**
      * Set the base y-vale for the plot.
@@ -76,26 +65,19 @@ public:
      * Set the draw style for the data (continuous, step, etc).
      * @param style - an identifier for a draw style.
      */
-    virtual void setDrawStyle( const QString& style ) Q_DECL_OVERRIDE;
+    virtual void setDrawStyle( const QString& style );
 
     /**
      * Set an identifier for this data set.
      * @param id - an identifier for this data set.
      */
-    virtual void setId( const QString& id ) Q_DECL_OVERRIDE;
+    virtual void setId( const QString& id );
 
     /**
      * Set whether or not to display a sample line with the legend item.
      * @param showLegendLine - true to display a sample line; false, otherwise.
      */
     virtual void setLegendLine( bool showLegendLine ) Q_DECL_OVERRIDE;
-
-    /**
-     * Turn on/off the legend for this data item.
-     * @param visible - true to see a corresponding legend for this data; false, to
-     *  not display a legend for this data.
-     */
-    virtual void setLegendVisible( bool visible ) Q_DECL_OVERRIDE;
 
     /**
      * Destructor.
@@ -105,9 +87,9 @@ public:
 protected:
 
     virtual void drawLines (QPainter *p, const QwtScaleMap &xMap, const QwtScaleMap &yMap,
-            const QRectF &canvasRect, int from, int to) const Q_DECL_OVERRIDE;
+            const QRectF &canvasRect, int from, int to) const;
     virtual void drawSteps (QPainter *p, const QwtScaleMap &xMap, const QwtScaleMap &yMap,
-            const QRectF &canvasRect, int from, int to) const Q_DECL_OVERRIDE;
+            const QRectF &canvasRect, int from, int to) const;
     //This method was put in so that profiles consisting of a single point could be drawn.
     void drawSymbol( QPainter* painter, const QwtScaleMap & xMap,
             const QwtScaleMap & yMap, const QRectF & canvasRect, int from, int to ) const;

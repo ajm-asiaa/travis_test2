@@ -15,7 +15,7 @@
 
 namespace Carta {
     namespace Lib {
-        class LayeredViewArbitrary;
+        class LayeredRemoteVGView;
     }
 }
 
@@ -114,7 +114,7 @@ protected:
      * Construct a layered view and return it.
      * @param path - a unique identifier for the remote view.
      */
-    Carta::Lib::LayeredViewArbitrary* makeRemoteView( const QString& path );
+    Carta::Lib::LayeredRemoteVGView* makeRemoteView( const QString& path );
 
     //Return the full location for the state with the given name.
     QString getStateLocation( const QString& name ) const;
@@ -426,6 +426,7 @@ private:
     typedef std::map <QString, ObjectRegistryEntry> ObjectRegistry;
 
     ObjectRegistry m_objects;
+    static std::shared_ptr<ObjectManager> m_om;
 
 };
 
