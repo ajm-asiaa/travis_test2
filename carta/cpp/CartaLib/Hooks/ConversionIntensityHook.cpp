@@ -1,7 +1,0 @@
-/**
- *
- **/
-
-
-#include "ConversionIntensityHook.h"
-
